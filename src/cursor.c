@@ -405,6 +405,8 @@ void roots_cursor_handle_touch_down(struct roots_cursor *cursor,
 	if (surface && roots_seat_allow_input(cursor->seat, surface->resource)) {
 		serial = wlr_seat_touch_notify_down(cursor->seat->seat, surface,
 			event->time_msec, event->touch_id, sx, sy);
+		wlr_seat_touch_notify_motion(cursor->seat->seat, event->time_msec,
+			event->touch_id, sx, sy);
 	}
 
 	if (serial && wlr_seat_touch_num_points(cursor->seat->seat) == 1) {
