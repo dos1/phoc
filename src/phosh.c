@@ -42,6 +42,8 @@ xdg_switcher_handle_list_xdg_surfaces(struct wl_client *client,
 	roots_xdg_surface_from_view(view);
       if (xdg_surface->xdg_surface->role != WLR_XDG_SURFACE_ROLE_TOPLEVEL)
 	continue;
+      if (xdg_surface->xdg_surface->toplevel->parent)
+	continue;
       app_id = xdg_surface->xdg_surface->toplevel->app_id;
       title = xdg_surface->xdg_surface->toplevel->title;
       break;
