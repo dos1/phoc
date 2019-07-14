@@ -440,6 +440,15 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	view_map(view, roots_xdg_surface->xdg_surface_v6->surface);
 	view_setup(view);
 
+	// catch up with state accumulated before commiting
+	if (roots_xdg_surface->xdg_surface_v6->toplevel->parent) {
+		struct roots_xdg_surface* parent = roots_xdg_surface->xdg_surface_v6->toplevel->parent->data;
+		view_set_parent(view, &parent->view);
+	}
+	view_maximize(view, roots_xdg_surface->xdg_surface_v6->toplevel->client_pending.maximized);
+	view_set_fullscreen(view, roots_xdg_surface->xdg_surface_v6->toplevel->client_pending.fullscreen,
+		roots_xdg_surface->xdg_surface_v6->toplevel->client_pending.fullscreen_output);
+
 	wlr_foreign_toplevel_handle_v1_set_title(view->toplevel_handle,
 		roots_xdg_surface->xdg_surface_v6->toplevel->title ?: "none");
 	wlr_foreign_toplevel_handle_v1_set_app_id(view->toplevel_handle,
@@ -483,15 +492,6 @@ void handle_xdg_shell_v6_surface(struct wl_listener *listener, void *data) {
 	view_init(&roots_surface->view, &view_impl, ROOTS_XDG_SHELL_V6_VIEW, desktop);
 	roots_surface->xdg_surface_v6 = surface;
 	surface->data = roots_surface;
-
-	// catch up with state accumulated before commiting
-	if (surface->toplevel->parent) {
-		struct roots_xdg_surface* parent = surface->toplevel->parent->data;
-		view_set_parent(&roots_surface->view, &parent->view);
-	}
-	view_maximize(&roots_surface->view, surface->toplevel->client_pending.maximized);
-	view_set_fullscreen(&roots_surface->view, surface->toplevel->client_pending.fullscreen,
-		surface->toplevel->client_pending.fullscreen_output);
 
 	roots_surface->surface_commit.notify = handle_surface_commit;
 	wl_signal_add(&surface->surface->events.commit,
