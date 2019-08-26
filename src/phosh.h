@@ -13,6 +13,7 @@ struct phosh_private {
   struct wl_resource* resource;
   struct wl_global *global;
   struct wl_list xdg_switchers; // phosh_private_xdg_switchers::link
+  struct wl_list dpms_managers; // phosh_private_dpms_managers::link
 
   PhocDesktop *desktop;
   struct {
@@ -35,8 +36,20 @@ struct phosh_private_xdg_switcher {
 };
 
 
+struct phosh_private_dpms_manager {
+  struct wl_list link;
+  struct wl_resource *resource;
+  struct phosh_private *phosh;
+
+  struct {
+    struct wl_signal destroy;
+  } events;
+};
+
+
 struct phosh_private* phosh_create(PhocDesktop *desktop,
 				   struct wl_display *display);
 void phosh_destroy(struct phosh_private *shell);
 struct phosh_private *phosh_private_from_resource(struct wl_resource *resource);
 struct phosh_private_xdg_switcher *phosh_private_xdg_switcher_from_resource(struct wl_resource *resource);
+struct phosh_private_dpms_manager *phosh_private_dpms_manager_from_resource(struct wl_resource *resource);
