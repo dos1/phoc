@@ -1,5 +1,5 @@
 <protocol name="phosh">
-  <interface name="phosh_private" version="3">
+  <interface name="phosh_private" version="4">
     <description summary="Phone shell extensions">
       Private protocol between phosh and the compositor.
     </description>
@@ -20,6 +20,10 @@
 
     <request name="get_xdg_switcher" since="2">
       <arg name="id" type="new_id" interface="phosh_private_xdg_switcher"/>
+    </request>
+
+    <request name="get_dpms_manager" since="4">
+      <arg name="id" type="new_id" interface="phosh_private_dpms_manager"/>
     </request>
   </interface>
 
@@ -74,4 +78,41 @@
     </request>
 
   </interface>
+
+  <!-- output dpms handling -->
+  <interface name="phosh_private_dpms_manager" version="4">
+    <description summary="Interface to handle output dpms">
+      The interface is meant to handle output DPMS.
+    </description>
+
+    <request name="destroy" type="destructor" since="2">
+      <description summary="destroy the dpms_manager interface instance"/>
+    </request>
+
+    <enum name="mode" since="4">
+      <entry name="on" value="0"
+             summary="DPMS mode on"/>
+      <entry name="standby" value="1"
+             summary="DPMS mode standby"/>
+      <entry name="suspend" value="2"
+             summary="DPMS mode suspend"/>
+      <entry name="off" value="3"
+             summary="DPMS mode off"/>
+    </enum>
+
+    <request name="set_mode" since="4">
+      <description summary="set the given DPMS mode on the output">
+      </description>
+      <arg name="output" type="object" interface="wl_output" summary="the output to set the dpms mode"/>
+      <arg name="mode" type="uint" enum="mode" summary="the dpms mode to set"/>
+    </request>
+
+    <event name="mode_changed" since="4">
+      <description summary="Report a dpms mode change"/>
+      <arg name="output" type="object" interface="wl_output" summary="the output that had it's dpms mode changed"/>
+      <arg name="mode" type="uint" enum="mode" summary="the output's dpms mode"/>
+    </event>
+
+  </interface>
+
 </protocol>

@@ -20,7 +20,7 @@
 #include "desktop.h"
 #include "phosh.h"
 
-#define PHOSH_PRIVATE_VERSION 3
+#define PHOSH_PRIVATE_VERSION 4
 
 static void
 xdg_switcher_handle_list_xdg_surfaces(struct wl_client *client,
@@ -211,6 +211,47 @@ static const struct phosh_private_xdg_switcher_interface phosh_private_xdg_switc
 };
 
 
+static void
+dpms_manager_handle_resource_destroy(struct wl_resource *resource)
+{
+  struct phosh_private_dpms_manager *dpms_manager =
+    phosh_private_dpms_manager_from_resource(resource);
+
+  g_debug ("Destroying dpms_manager %p (res %p)", dpms_manager,
+	   dpms_manager->resource);
+  wl_list_remove(&dpms_manager->link);
+  free(dpms_manager);
+}
+
+
+static void
+dpms_manager_handle_destroy(struct wl_client *client,
+			    struct wl_resource *resource)
+{
+  wl_resource_destroy(resource);
+}
+
+static void
+dpms_manager_handle_set_mode(struct wl_client *client,
+			     struct wl_resource *resource,
+			     struct wl_resource *output,
+			     uint32_t mode)
+{
+  g_debug ("Should set dpms mode %d", mode);
+  struct wlr_output *wlr_output = wlr_output_from_resource (output);
+
+  if (mode)
+    wlr_output_enable (wlr_output, false);
+  else
+    wlr_output_enable (wlr_output, true);
+}
+
+
+static const struct phosh_private_dpms_manager_interface phosh_private_dpms_manager_impl = {
+  .destroy = dpms_manager_handle_destroy,
+  .set_mode = dpms_manager_handle_set_mode,
+};
+
 static
 void phosh_rotate_display(struct wl_client *client,
 			  struct wl_resource *resource,
@@ -319,6 +360,38 @@ handle_get_xdg_switcher(struct wl_client *client,
 
 
 static void
+handle_get_dpms_manager(struct wl_client *client,
+			struct wl_resource *phosh_private_resource,
+			uint32_t id)
+{
+  struct phosh_private *phosh =
+    phosh_private_from_resource(phosh_private_resource);
+
+  int version = wl_resource_get_version(phosh_private_resource);
+  struct phosh_private_dpms_manager *dpms_manager =
+    calloc(1, sizeof(struct phosh_private_dpms_manager));
+  if (dpms_manager == NULL) {
+    wl_client_post_no_memory(client);
+    return;
+  }
+  g_debug ("new phosh_private_dpms_manager %p (res %p)", dpms_manager,
+	   dpms_manager->resource);
+  dpms_manager->resource = wl_resource_create(client,
+					      &phosh_private_dpms_manager_interface, version, id);
+  if (dpms_manager->resource == NULL) {
+    free(dpms_manager);
+    wl_client_post_no_memory(client);
+    return;
+  }
+  wl_resource_set_implementation(dpms_manager->resource,
+				 &phosh_private_dpms_manager_impl, dpms_manager, dpms_manager_handle_resource_destroy);
+  wl_signal_init(&dpms_manager->events.destroy);
+  wl_list_insert(&phosh->dpms_managers, &dpms_manager->link);
+  dpms_manager->phosh = phosh;
+}
+
+
+static void
 phosh_handle_resource_destroy(struct wl_resource *resource)
 {
   struct phosh_private *phosh = wl_resource_get_user_data(resource);
@@ -332,6 +405,7 @@ phosh_handle_resource_destroy(struct wl_resource *resource)
 static const struct phosh_private_interface phosh_private_impl = {
   phosh_rotate_display,
   handle_get_xdg_switcher,
+  handle_get_dpms_manager,
 };
 
 
@@ -375,6 +449,7 @@ phosh_create(PhocDesktop *desktop, struct wl_display *display)
 		&phosh->listeners.layer_shell_new_surface);
   phosh->listeners.layer_shell_new_surface.notify = handle_phosh_layer_shell_new_surface;
   wl_list_init(&phosh->xdg_switchers);
+  wl_list_init(&phosh->dpms_managers);
 
   g_info ("Initializing phosh private interface");
   phosh->global = wl_global_create(display, &phosh_private_interface, PHOSH_PRIVATE_VERSION, phosh, phosh_bind);
@@ -408,5 +483,12 @@ struct phosh_private_xdg_switcher
 *phosh_private_xdg_switcher_from_resource(struct wl_resource *resource) {
   assert(wl_resource_instance_of(resource, &phosh_private_xdg_switcher_interface,
 				 &phosh_private_xdg_switcher_impl));
+  return wl_resource_get_user_data(resource);
+}
+
+struct phosh_private_dpms_manager
+*phosh_private_dpms_manager_from_resource(struct wl_resource *resource) {
+  assert(wl_resource_instance_of(resource, &phosh_private_dpms_manager_interface,
+				 &phosh_private_dpms_manager_impl));
   return wl_resource_get_user_data(resource);
 }
