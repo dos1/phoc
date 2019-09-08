@@ -82,6 +82,9 @@ static void handle_im_destroy(struct wl_listener *listener, void *data) {
 	if (text_input) {
 		// keyboard focus is still there, so keep the surface at hand in case
 		// the input method returns
+		if (text_input->pending_focused_surface) {
+			text_input_clear_pending_focused_surface(text_input);
+		}
 		text_input_set_pending_focused_surface(text_input,
 			text_input->input->focused_surface);
 		wlr_text_input_v3_send_leave(text_input->input);
