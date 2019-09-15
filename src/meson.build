@@ -1,11 +1,11 @@
 sources = [
+  'bindings.c',
   'settings.c',
   'cursor.c',
   'desktop.c',
   'ini.c',
   'input.c',
   'keyboard.c',
-  'keybindings.c',
   'layer_shell.c',
   'main.c',
   'output.c',
