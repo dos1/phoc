@@ -64,15 +64,12 @@ if get_option('xwayland').enabled() and not wlroots_has_xwayland
 endif
 have_xwayland = get_option('xwayland').enabled()
 
-config_h = configuration_data()
-config_h.set_quoted('PHOC_VERSION', meson.project_version())
-config_h.set('PHOC_XWAYLAND', have_xwayland)
-
-configure_file(
-  input: 'config.h.in',
-  output: 'config.h',
-  configuration: config_h,
-)
+wlroots_major_version = wlroots.version().split('.')[0]
+wlroots_minor_version = wlroots.version().split('.')[1]
+use_gamma_control = false
+if wlroots_major_version.to_int() == 0 and wlroots_minor_version.to_int() == 6
+  use_gamma_control = true
+endif
 
 global_c_args = []
 test_c_args = [
@@ -136,10 +133,24 @@ summary = [
         '',
         '           xwayland: @0@'.format(have_xwayland),
         ' wlroots subproject: @0@'.format(not embed_wlroots.disabled() and wlroots_proj.found()),
+        '    wlroots version: @0@'.format(wlroots.version()),
+        '  use gamma control: @0@'.format(use_gamma_control),
         '--------------------------',
         ''
 ]
 message('\n'.join(summary))
+
+
+config_h = configuration_data()
+config_h.set_quoted('PHOC_VERSION', meson.project_version())
+config_h.set('PHOC_XWAYLAND', have_xwayland)
+config_h.set('PHOC_USE_GAMMA_CONTROL', use_gamma_control)
+
+configure_file(
+  input: 'config.h.in',
+  output: 'config.h',
+  configuration: config_h,
+)
 
 run_data = configuration_data()
 run_data.set('ABS_BUILDDIR', meson.current_build_dir())

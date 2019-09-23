@@ -1,5 +1,7 @@
 #define G_LOG_DOMAIN "phoc-desktop"
 
+#include "config.h"
+
 #define _POSIX_C_SOURCE 200112L
 #include <assert.h>
 #include <math.h>
@@ -12,7 +14,9 @@
 #include <wlr/types/wlr_data_control_v1.h>
 #include <wlr/types/wlr_export_dmabuf_v1.h>
 #include <wlr/types/wlr_gamma_control_v1.h>
-#include <wlr/types/wlr_gamma_control.h>
+#ifdef PHOC_USE_GAMMA_CONTROL
+#  include <wlr/types/wlr_gamma_control.h>
+#endif
 #include <wlr/types/wlr_gtk_primary_selection.h>
 #include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_idle.h>
@@ -28,7 +32,6 @@
 #include <wlr/types/wlr_xdg_shell_v6.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
-#include "config.h"
 #include "layers.h"
 #include "seat.h"
 #include "server.h"
@@ -468,9 +471,10 @@ phoc_desktop_constructed (GObject *object)
   }
 #endif
 
+#ifdef PHOC_USE_GAMMA_CONTROL
   self->gamma_control_manager = wlr_gamma_control_manager_create(server->wl_display);
+#endif
   self->gamma_control_manager_v1 = wlr_gamma_control_manager_v1_create(server->wl_display);
-  self->screenshooter = wlr_screenshooter_create(server->wl_display);
   self->export_dmabuf_manager_v1 =
     wlr_export_dmabuf_manager_v1_create(server->wl_display);
   self->server_decoration_manager =

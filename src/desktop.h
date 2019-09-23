@@ -1,12 +1,16 @@
 #pragma once
 
+#include "config.h"
+
 #include <time.h>
 #include <wayland-server.h>
 #include <wlr/config.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_foreign_toplevel_management_v1.h>
 #include <wlr/types/wlr_gamma_control_v1.h>
+#ifdef PHOC_USE_GAMMA_CONTROL
 #include <wlr/types/wlr_gamma_control.h>
+#endif
 #include <wlr/types/wlr_gtk_primary_selection.h>
 #include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_idle.h>
@@ -21,7 +25,6 @@
 #include <wlr/types/wlr_presentation_time.h>
 #include <wlr/types/wlr_relative_pointer_v1.h>
 #include <wlr/types/wlr_screencopy_v1.h>
-#include <wlr/types/wlr_screenshooter.h>
 #include <wlr/types/wlr_text_input_v3.h>
 #include <wlr/types/wlr_virtual_keyboard_v1.h>
 #include <wlr/types/wlr_xcursor_manager.h>
@@ -32,7 +35,6 @@
 #include <gio/gio.h>
 
 #include "settings.h"
-#include "config.h"
 
 #define PHOC_TYPE_DESKTOP (phoc_desktop_get_type())
 
@@ -62,9 +64,10 @@ struct _PhocDesktop {
 	struct wlr_compositor *compositor;
 	struct wlr_xdg_shell_v6 *xdg_shell_v6;
 	struct wlr_xdg_shell *xdg_shell;
+#ifdef PHOC_USE_GAMMA_CONTROL
 	struct wlr_gamma_control_manager *gamma_control_manager;
+#endif
 	struct wlr_gamma_control_manager_v1 *gamma_control_manager_v1;
-	struct wlr_screenshooter *screenshooter;
 	struct wlr_export_dmabuf_manager_v1 *export_dmabuf_manager_v1;
 	struct wlr_server_decoration_manager *server_decoration_manager;
 	struct wlr_xdg_decoration_manager_v1 *xdg_decoration_manager;
