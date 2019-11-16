@@ -44,6 +44,7 @@ phoc_keyboard_set_property (GObject     *object,
   case PROP_DEVICE:
     self->device = g_value_get_pointer (value);
     self->device->data = self;
+    self->device->keyboard->data = self;
     g_object_notify_by_pspec (G_OBJECT (self), props[PROP_DEVICE]);
     break;
   case PROP_SEAT:
@@ -387,8 +388,8 @@ set_xkb_keymap (PhocKeyboard *self, const gchar *layout, const gchar *variant, c
 
 static void
 on_input_setting_changed (PhocKeyboard *self,
-                             const gchar  *key,
-                             GSettings    *settings)
+                          const gchar  *key,
+                          GSettings    *settings)
 {
   g_auto(GStrv) xkb_options = NULL;
   g_autoptr(GVariant) sources = NULL;
@@ -465,9 +466,9 @@ phoc_keyboard_dispose(GObject *object)
 {
   PhocKeyboard *self = PHOC_KEYBOARD (object);
 
-  g_clear_pointer (&self->input_settings, g_object_unref);
-  g_clear_pointer (&self->keyboard_settings, g_object_unref);
-  g_clear_pointer (&self->xkbinfo, g_object_unref);
+  g_clear_object (&self->input_settings);
+  g_clear_object (&self->keyboard_settings);
+  g_clear_object (&self->xkbinfo);
 
   G_OBJECT_CLASS (phoc_keyboard_parent_class)->dispose (object);
 }
@@ -558,4 +559,38 @@ phoc_keyboard_new (struct wlr_input_device *device, struct roots_seat *seat)
                        "device", device,
                        "seat", seat,
                        NULL);
+}
+
+/**
+ * phoc_keyboard_next_layout:
+ *
+ * Switch to next keyboard in the list of available layouts
+ */
+void
+phoc_keyboard_next_layout (PhocKeyboard *self)
+{
+  g_autoptr(GVariant) sources = NULL;
+  GVariantIter iter;
+  gchar *type, *id, *cur_type, *cur_id;
+  GVariantBuilder builder;
+  gboolean next;
+
+  g_return_if_fail (PHOC_IS_KEYBOARD (self));
+  sources = g_settings_get_value(self->input_settings, "sources");
+
+  if (g_variant_n_children (sources) < 2)
+    return;
+
+  g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(ss)"));
+  g_variant_iter_init (&iter, sources);
+  next = g_variant_iter_next (&iter, "(ss)", &cur_type, &cur_id);
+  while (next) {
+    next = g_variant_iter_next (&iter, "(ss)", &type, &id);
+    if (!next)
+      break;
+    g_variant_builder_add (&builder, "(ss)", type, id);
+  }
+  g_variant_builder_add (&builder, "(ss)", cur_type, cur_id);
+
+  g_settings_set_value(self->input_settings, "sources", g_variant_builder_end(&builder));
 }
