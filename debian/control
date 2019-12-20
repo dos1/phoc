@@ -1,6 +1,7 @@
 Source: phoc
 Priority: optional
 Maintainer: Guido Günther <agx@sigxcpu.org>
+Uploaders: Sebastian Krzyszkowiak <sebastian.krzyszkowiak@puri.sm>
 Build-Depends:
  debhelper (>= 12),
  libglib2.0-dev,
@@ -40,6 +41,8 @@ Architecture: any
 Depends:
  ${misc:Depends},
  ${shlibs:Depends},
+ gsettings-desktop-schemas,
+ mutter-common,
 Recommends: phosh
 Description: Wayland compositor for mobile phones
  Tiny wayland compositor based on wlroots for use on mobile phones like the

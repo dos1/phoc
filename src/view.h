@@ -38,6 +38,17 @@ enum roots_view_type {
 #endif
 };
 
+typedef enum {
+  PHOC_VIEW_TILE_LEFT,
+  PHOC_VIEW_TILE_RIGHT,
+} PhocViewTileDirection;
+
+typedef enum {
+  PHOC_VIEW_STATE_NORMAL,
+  PHOC_VIEW_STATE_MAXIMIZED,
+  PHOC_VIEW_STATE_TILED,
+} PhocViewState;
+
 struct roots_view {
 	enum roots_view_type type;
 	const struct roots_view_interface *impl;
@@ -56,9 +67,10 @@ struct roots_view {
 	char *title;
 	char *app_id;
 
-	bool maximized;
+	PhocViewState state;
 	struct roots_output *fullscreen_output;
 	struct {
+		PhocViewState state;
 		double x, y;
 		uint32_t width, height;
 		float rotation;
@@ -215,6 +227,7 @@ void view_destroy(struct roots_view *view);
 void view_activate(struct roots_view *view, bool activate);
 void view_apply_damage(struct roots_view *view);
 void view_damage_whole(struct roots_view *view);
+gboolean view_is_maximized(const struct roots_view *view);
 void view_update_position(struct roots_view *view, int x, int y);
 void view_update_size(struct roots_view *view, int width, int height);
 void view_update_decorated(struct roots_view *view, bool decorated);
@@ -224,10 +237,12 @@ void view_unmap(struct roots_view *view);
 void view_arrange_maximized(struct roots_view *view);
 void view_get_box(const struct roots_view *view, struct wlr_box *box);
 void view_move(struct roots_view *view, double x, double y);
+bool view_move_to_next_output (struct roots_view *view, enum wlr_direction direction);
 void view_resize(struct roots_view *view, uint32_t width, uint32_t height);
 void view_move_resize(struct roots_view *view, double x, double y,
 	uint32_t width, uint32_t height);
 void view_auto_maximize(struct roots_view *view);
+void view_tile(struct roots_view *view, PhocViewTileDirection direction);
 void view_maximize(struct roots_view *view, bool maximize);
 void view_set_fullscreen(struct roots_view *view, bool fullscreen,
 	struct wlr_output *output);

@@ -1,5 +1,5 @@
 project('phoc', 'c',
-          version: '0.1.3',
+          version: '0.1.4',
           license: 'GPLv3+',
     meson_version: '>= 0.47.0',
   default_options: [
@@ -42,7 +42,7 @@ if not embed_wlroots.disabled()
    # Try first to find wlroots as a subproject, then as a system dependency
    wlroots_proj = subproject(
         'wlroots',
-        default_options: ['rootston=false', 'examples=false'],
+        default_options: ['examples=false'],
         required: false,
    )
 

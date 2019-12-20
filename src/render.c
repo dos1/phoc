@@ -102,6 +102,8 @@ static void render_surface_iterator(struct roots_output *output,
 
 	render_texture(wlr_output, output_damage,
 		texture, &box, matrix, rotation, alpha);
+
+	wlr_presentation_surface_sampled(output->desktop->presentation, surface);
 }
 
 static void render_decorations(struct roots_output *output,
@@ -234,6 +236,8 @@ static bool scan_out_fullscreen_view(struct roots_output *output) {
 			surface->current.transform != wlr_output->transform) {
 		return false;
 	}
+
+	wlr_presentation_surface_sampled(output->desktop->presentation, surface);
 
 	if (!wlr_output_attach_buffer(wlr_output, surface->buffer)) {
 		return false;
