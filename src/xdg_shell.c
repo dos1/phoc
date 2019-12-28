@@ -505,6 +505,8 @@ void handle_xdg_shell_surface(struct wl_listener *listener, void *data) {
 	view_init(&roots_surface->view, &view_impl, ROOTS_XDG_SHELL_VIEW, desktop);
 	roots_surface->xdg_surface = surface;
 	surface->data = roots_surface;
+	/* Allow to get the roots_surface from wlr_surface */
+	surface->surface->data = &roots_surface->view;
 
 	// catch up with state accumulated before commiting
 	if (surface->toplevel->parent) {

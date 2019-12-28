@@ -19,6 +19,7 @@ sources = [
   'util.c',
   'view.c',
   'virtual_keyboard.c',
+  'xdg_foreign_v1.c',
   'xdg_shell.c',
   'xdg_shell_v6.c',
 ]

@@ -503,6 +503,7 @@ phoc_desktop_constructed (GObject *object)
   self->text_input = wlr_text_input_manager_v3_create(server->wl_display);
 
   self->gtk_shell = phoc_gtk_shell_create(self, server->wl_display);
+  self->xdg_foreign = phoc_xdg_foreign_v1_create(server->wl_display);
   self->phosh = phosh_create(self, server->wl_display);
   self->virtual_keyboard = wlr_virtual_keyboard_manager_v1_create(
 								  server->wl_display);

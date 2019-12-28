@@ -44,6 +44,7 @@ G_DECLARE_FINAL_TYPE (PhocDesktop, phoc_desktop, PHOC, DESKTOP, GObject);
 #include "view.h"
 #include "phosh.h"
 #include "gtk-shell.h"
+#include "xdg_foreign_v1.h"
 
 struct _PhocDesktop {
 	GObject parent;
@@ -106,6 +107,7 @@ struct _PhocDesktop {
 	/* Protocols that upstreamable implementations */
 	struct phosh_private *phosh;
 	PhocGtkShell *gtk_shell;
+	PhocXdgForeignV1 *xdg_foreign;
 };
 
 PhocDesktop *phoc_desktop_new (struct roots_config *config);
