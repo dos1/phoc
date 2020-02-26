@@ -13,8 +13,7 @@ Build-Depends:
  meson (>= 0.47.0),
  pkg-config,
  wayland-protocols,
- libwlroots-dev (>= 0.6.0) <!pkg.phoc.embedwlroots>,
- libwlroots-dev (<< 0.9.0) <!pkg.phoc.embedwlroots>,
+ libwlroots-dev (>= 0.9.0) <!pkg.phoc.embedwlroots>,
 # For wlroots subproject build
  libcap-dev <pkg.phoc.embedwlroots>,
  libdrm-dev <pkg.phoc.embedwlroots>,
@@ -52,6 +51,8 @@ Depends:
  gsettings-desktop-schemas,
  mutter-common,
 Recommends: phosh
+Breaks:
+ phosh (<< 0.2.0),
 Description: Wayland compositor for mobile phones
  Tiny wayland compositor based on wlroots for use on mobile phones like the
  Librem 5.

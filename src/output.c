@@ -11,7 +11,6 @@
 #include <wlr/config.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_output_layout.h>
-#include <wlr/types/wlr_presentation_time.h>
 #include <wlr/types/wlr_xdg_shell_v6.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
@@ -506,8 +505,9 @@ void handle_output_manager_apply(struct wl_listener *listener, void *data) {
 	wl_list_for_each(config_head, &config->heads, link) {
 		struct wlr_output *wlr_output = config_head->state.output;
 		if (!config_head->state.enabled) {
-			ok &= wlr_output_enable(wlr_output, false);
+			wlr_output_enable(wlr_output, false);
 			wlr_output_layout_remove(desktop->layout, wlr_output);
+			ok &= wlr_output_commit(wlr_output);
 		}
 	}
 
@@ -517,11 +517,11 @@ void handle_output_manager_apply(struct wl_listener *listener, void *data) {
 		if (!config_head->state.enabled) {
 			continue;
 		}
-		ok &= wlr_output_enable(wlr_output, true);
+		wlr_output_enable(wlr_output, true);
 		if (config_head->state.mode != NULL) {
-			ok &= wlr_output_set_mode(wlr_output, config_head->state.mode);
+			wlr_output_set_mode(wlr_output, config_head->state.mode);
 		} else {
-			ok &= wlr_output_set_custom_mode(wlr_output,
+			wlr_output_set_custom_mode(wlr_output,
 				config_head->state.custom_mode.width,
 				config_head->state.custom_mode.height,
 				config_head->state.custom_mode.refresh);
@@ -530,6 +530,7 @@ void handle_output_manager_apply(struct wl_listener *listener, void *data) {
 			config_head->state.x, config_head->state.y);
 		wlr_output_set_transform(wlr_output, config_head->state.transform);
 		wlr_output_set_scale(wlr_output, config_head->state.scale);
+		ok &= wlr_output_commit(wlr_output);
 	}
 
 	if (ok) {
@@ -562,7 +563,6 @@ static void output_destroy(struct roots_output *output) {
 	wl_list_remove(&output->enable.link);
 	wl_list_remove(&output->mode.link);
 	wl_list_remove(&output->transform.link);
-	wl_list_remove(&output->present.link);
 	wl_list_remove(&output->damage_frame.link);
 	wl_list_remove(&output->damage_destroy.link);
 	free(output);
@@ -607,32 +607,6 @@ static void output_handle_transform(struct wl_listener *listener, void *data) {
 	arrange_layers(output);
 }
 
-static void surface_send_presented_iterator(struct roots_output *output,
-		struct wlr_surface *surface, struct wlr_box *_box, float rotation,
-		void *data) {
-	struct wlr_presentation_event *event = data;
-	wlr_presentation_send_surface_presented(output->desktop->presentation,
-		surface, event);
-}
-
-static void output_handle_present(struct wl_listener *listener, void *data) {
-	struct roots_output *output =
-		wl_container_of(listener, output, present);
-	struct wlr_output_event_present *output_event = data;
-
-	struct wlr_presentation_event event = {
-		.output = output->wlr_output,
-		.tv_sec = (uint64_t)output_event->when->tv_sec,
-		.tv_nsec = (uint32_t)output_event->when->tv_nsec,
-		.refresh = (uint32_t)output_event->refresh,
-		.seq = (uint64_t)output_event->seq,
-		.flags = output_event->flags,
-	};
-
-	output_for_each_surface(output,
-		surface_send_presented_iterator, &event);
-}
-
 void handle_new_output(struct wl_listener *listener, void *data) {
 	PhocDesktop *desktop = wl_container_of(listener, desktop,
 		new_output);
@@ -665,8 +639,6 @@ void handle_new_output(struct wl_listener *listener, void *data) {
 	wl_signal_add(&wlr_output->events.mode, &output->mode);
 	output->transform.notify = output_handle_transform;
 	wl_signal_add(&wlr_output->events.transform, &output->transform);
-	output->present.notify = output_handle_present;
-	wl_signal_add(&wlr_output->events.present, &output->present);
 
 	output->damage_frame.notify = output_damage_handle_frame;
 	wl_signal_add(&output->damage->events.frame, &output->damage_frame);
@@ -713,6 +685,7 @@ void handle_new_output(struct wl_listener *listener, void *data) {
 		}
 		wlr_output_layout_add_auto(desktop->layout, wlr_output);
 	}
+	wlr_output_commit(wlr_output);
 
 	struct roots_seat *seat;
 	wl_list_for_each(seat, &input->seats, link) {

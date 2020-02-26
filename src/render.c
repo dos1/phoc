@@ -134,7 +134,8 @@ static void render_surface_iterator(struct roots_output *output,
 	render_texture(wlr_output, output_damage,
 		texture, &box, matrix, rotation, alpha);
 
-	wlr_presentation_surface_sampled(output->desktop->presentation, surface);
+	wlr_presentation_surface_sampled_on_output(output->desktop->presentation,
+		surface, wlr_output);
 
 	collect_touch_points(output, surface, box);
 }
@@ -455,6 +456,7 @@ void output_render(struct roots_output *output) {
 
 	if (!needs_frame) {
 		// Output doesn't need swap and isn't damaged, skip rendering completely
+		wlr_output_rollback(wlr_output);
 		goto buffer_damage_finish;
 	}
 
