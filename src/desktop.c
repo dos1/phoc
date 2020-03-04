@@ -20,6 +20,7 @@
 #include <wlr/types/wlr_input_inhibitor.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_output_layout.h>
+#include <wlr/types/wlr_output_power_management_v1.h>
 #include <wlr/types/wlr_pointer_constraints_v1.h>
 #include <wlr/types/wlr_server_decoration.h>
 #include <wlr/types/wlr_tablet_v2.h>
@@ -209,8 +210,7 @@ struct wlr_surface *desktop_surface_at(PhocDesktop *desktop,
 			return surface;
 		}
 
-		struct roots_output *output =
-			desktop_output_from_wlr_output(desktop, wlr_output);
+		struct roots_output *output = wlr_output->data;
 		if (output != NULL && output->fullscreen_view != NULL) {
 
 			if (output->force_shell_reveal) {
@@ -542,6 +542,13 @@ phoc_desktop_constructed (GObject *object)
   wl_signal_add(&self->output_manager_v1->events.test,
 		&self->output_manager_test);
 
+  self->output_power_manager_v1 =
+    wlr_output_power_manager_v1_create(server->wl_display);
+  self->output_power_manager_set_mode.notify =
+    phoc_output_handle_output_power_manager_set_mode;
+  wl_signal_add(&self->output_power_manager_v1->events.set_mode,
+		&self->output_power_manager_set_mode);
+
   wlr_data_control_manager_v1_create(server->wl_display);
 
   self->settings = g_settings_new ("sm.puri.phoc");
@@ -595,18 +602,6 @@ PhocDesktop *
 phoc_desktop_new (struct roots_config *config)
 {
   return g_object_new (PHOC_TYPE_DESKTOP, "config", config, NULL);
-}
-
-
-struct roots_output *desktop_output_from_wlr_output(
-		PhocDesktop *desktop, struct wlr_output *wlr_output) {
-	struct roots_output *output;
-	wl_list_for_each(output, &desktop->outputs, link) {
-		if (output->wlr_output == wlr_output) {
-			return output;
-		}
-	}
-	return NULL;
 }
 
 
