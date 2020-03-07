@@ -183,4 +183,6 @@ bool roots_seat_allow_input(struct roots_seat *seat,
 
 void roots_seat_maybe_set_cursor (struct roots_seat *seat, const char *name);
 
+void roots_seat_toggle_touch(struct roots_seat *self);
+
 #endif

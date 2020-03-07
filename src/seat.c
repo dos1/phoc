@@ -1720,3 +1720,69 @@ struct roots_cursor *roots_seat_get_cursor(struct roots_seat *self) {
 
 	return self->cursor;
 }
+
+static uint32_t dummy_touch_grab_down(struct wlr_seat_touch_grab *grab,
+				      uint32_t time_msec,
+				      struct wlr_touch_point *point)
+{
+	return 0;
+}
+
+static void dummy_touch_grab_up(struct wlr_seat_touch_grab *grab,
+				uint32_t time_msec,
+				struct wlr_touch_point *point)
+{
+}
+
+static void dummy_touch_grab_motion(struct wlr_seat_touch_grab *grab,
+				    uint32_t time_msec,
+				    struct wlr_touch_point *point)
+{
+}
+
+static void dummy_touch_grab_enter(struct wlr_seat_touch_grab *grab,
+				   uint32_t time_msec,
+				   struct wlr_touch_point *point)
+{
+}
+
+static void dummy_touch_grab_cancel(struct wlr_seat_touch_grab *grab)
+{
+}
+
+static const struct wlr_touch_grab_interface dummy_touch_grab_interface =
+{
+	.down = dummy_touch_grab_down,
+	.up = dummy_touch_grab_up,
+	.motion = dummy_touch_grab_motion,
+	.enter = dummy_touch_grab_enter,
+	.cancel = dummy_touch_grab_cancel
+};
+
+/**
+ * roots_seat_toggle_touch:
+ *
+ * Enable or disable touch events based on current state, by setting up
+ * a dummy touch grab. This is especially useful when blanking the screen.
+ *
+ * @self: a struct roots_seat
+ */
+void roots_seat_toggle_touch(struct roots_seat *self) {
+	struct wlr_seat_touch_grab *touch_grab;
+
+	if (!wlr_seat_touch_has_grab(self->seat)) {
+		touch_grab = calloc(1, sizeof(struct wlr_seat_touch_grab));
+		if (!touch_grab)
+			return;
+
+		touch_grab->seat = self->seat;
+		touch_grab->interface = &dummy_touch_grab_interface;
+		wlr_seat_touch_start_grab(self->seat, touch_grab);
+	} else {
+		touch_grab = self->seat->touch_state.grab;
+		wlr_seat_touch_end_grab(self->seat);
+		/* Make sure the touch grab has changed before freeing memory */
+		if (touch_grab != self->seat->touch_state.grab)
+			free(touch_grab);
+	}
+}
