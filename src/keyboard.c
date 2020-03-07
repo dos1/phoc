@@ -187,6 +187,7 @@ keyboard_execute_compositor_binding(PhocKeyboard *self,
   if (keysym == XKB_KEY_XF86PowerDown || keysym == XKB_KEY_XF86PowerOff) {
     g_debug ("Power button pressed");
     phoc_desktop_toggle_output_blank (server->desktop);
+    roots_seat_toggle_touch(self->seat);
     return true;
   }
 
