@@ -29,6 +29,11 @@ struct _PhocServer {
   PhocDesktop *desktop;
   struct roots_input *input;
 
+  /* The session */
+  gchar *session;
+  gint exit_status;
+  GMainLoop *mainloop;
+
   /* Wayland resources */
   struct wl_display *wl_display;
 
@@ -42,8 +47,8 @@ struct _PhocServer {
 
 PhocServer *phoc_server_get_default (void);
 gboolean phoc_server_setup (PhocServer *server, const char *config_path,
-			    const char *exec, gboolean debug_damage,
-			    gboolean debug_touch);
-
+			    const char *exec, GMainLoop *mainloop,
+			    gboolean debug_damage, gboolean debug_touch);
+gint phoc_server_get_session_exit_status (PhocServer *self);
 
 G_END_DECLS

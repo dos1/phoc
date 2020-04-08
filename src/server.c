@@ -77,30 +77,50 @@ phoc_wayland_init (PhocServer *server)
 }
 
 
-static gboolean
-phoc_startup_cmd_in_idle(PhocServer *server)
+static void
+on_session_exit (GPid pid, gint status, PhocServer *self)
 {
-  const char *cmd = server->config->startup_cmd;
-  pid_t pid = fork();
+  g_autoptr(GError) err = NULL;
 
-  g_return_val_if_fail (cmd, FALSE);
-
-  if (pid < 0) {
-    g_warning ("Cannot execute binding command: fork() failed");
-  } else if (pid == 0) {
-    execl("/bin/sh", "/bin/sh", "-c", cmd, (void *)NULL);
+  g_return_if_fail (PHOC_IS_SERVER (self));
+  g_spawn_close_pid (pid);
+  if (g_spawn_check_exit_status (status, &err)) {
+    self->exit_status = 0;
+  } else {
+    if (err->domain ==  G_SPAWN_EXIT_ERROR)
+      self->exit_status = err->code;
+    else
+    g_warning ("Session terminated: %s (%d)", err->message, self->exit_status);
   }
+  g_main_loop_quit (self->mainloop);
+}
 
+
+static gboolean
+phoc_startup_session_in_idle(PhocServer *self)
+{
+  GPid pid;
+  g_autoptr(GError) err = NULL;
+  gchar *cmd[] = { "/bin/sh", "-c", self->session, NULL };
+
+  if (g_spawn_async (NULL, cmd, NULL,
+		      G_SPAWN_DO_NOT_REAP_CHILD,
+		      NULL, self, &pid, &err)) {
+    g_child_watch_add (pid, (GChildWatchFunc)on_session_exit, self);
+  } else {
+    g_warning ("Failed to launch session: %s", err->message);
+    g_main_loop_quit (self->mainloop);
+  }
   return FALSE;
 }
 
 static void
-phoc_startup_cmd (PhocServer *server)
+phoc_startup_session (PhocServer *server)
 {
   gint id;
 
-  id = g_idle_add ((GSourceFunc) phoc_startup_cmd_in_idle, server);
-  g_source_set_name_by_id (id, "[phoc] phoc_startup_cmd");
+  id = g_idle_add ((GSourceFunc) phoc_startup_session_in_idle, server);
+  g_source_set_name_by_id (id, "[phoc] phoc_startup_session");
 }
 
 
@@ -143,6 +163,7 @@ phoc_server_dispose (GObject *object)
   g_clear_pointer (&self->wl_display, &wl_display_destroy_clients);
   g_clear_pointer (&self->wl_display, &wl_display_destroy);
   g_clear_object (&self->desktop);
+  g_clear_pointer (&self->session, g_free);
 
   G_OBJECT_CLASS (phoc_server_parent_class)->finalize (object);
 }
@@ -191,17 +212,21 @@ phoc_server_get_default (void)
  */
 gboolean
 phoc_server_setup (PhocServer *server, const char *config_path,
-		   const char *exec, gboolean debug_damage,
-		   gboolean debug_touch)
+		   const char *session, GMainLoop *mainloop,
+		   gboolean debug_damage, gboolean debug_touch)
 {
-  server->config = roots_config_create(config_path, exec, debug_damage, debug_touch);
+  server->config = roots_config_create(config_path, debug_damage, debug_touch);
   if (!server->config) {
     g_warning("Failed to parse config");
     return FALSE;
   }
 
+  server->mainloop = mainloop;
+  server->exit_status = 1;
   server->desktop = phoc_desktop_new (server->config);
   server->input = input_create(server->config);
+  server->session = g_strdup (session);
+  server->mainloop = mainloop;
 
   const char *socket = wl_display_add_socket_auto(server->wl_display);
   if (!socket) {
@@ -230,8 +255,22 @@ phoc_server_setup (PhocServer *server, const char *config_path,
 #endif
 
   phoc_wayland_init (server);
-  if (server->config->startup_cmd)
-    phoc_startup_cmd (server);
+  if (server->session)
+    phoc_startup_session (server);
 
   return TRUE;
+}
+
+/**
+ * phoc_server_get_exit_status:
+ *
+ * Return the session's exit status. This is only meaningful
+ * if the session has ended.
+ *
+ * Returns: The session's exit status.
+ */
+gint
+phoc_server_get_session_exit_status (PhocServer *self)
+{
+  return self->exit_status;
 }
