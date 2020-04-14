@@ -430,38 +430,32 @@ static void handle_pointer_focus_change(struct wl_listener *listener,
 static void seat_reset_device_mappings(struct roots_seat *seat,
 		struct wlr_input_device *device) {
 	struct wlr_cursor *cursor = seat->cursor->cursor;
-	struct roots_config *config = seat->input->config;
-
 	wlr_cursor_map_input_to_output(cursor, device, NULL);
-	struct roots_device_config *dconfig;
-	if ((dconfig = roots_config_get_device(config, device))) {
-		wlr_cursor_map_input_to_region(cursor, device, dconfig->mapped_box);
-	}
 }
 
 static void seat_set_device_output_mappings(struct roots_seat *seat,
-		struct wlr_input_device *device, struct wlr_output *output) {
+		struct wlr_input_device *device, struct roots_output *output) {
 	struct wlr_cursor *cursor = seat->cursor->cursor;
-	struct roots_config *config = seat->input->config;
-	struct roots_device_config *dconfig =
-		roots_config_get_device(config, device);
 
-	const char *mapped_output = NULL;
-	if (dconfig != NULL) {
-		mapped_output = dconfig->mapped_output;
-	}
-	if (mapped_output == NULL) {
-		mapped_output = device->output_name;
+	switch (device->type) {
+	  /* only map devices with absolute posistions */
+	case WLR_INPUT_DEVICE_TOUCH:
+	case WLR_INPUT_DEVICE_TABLET_TOOL:
+	case WLR_INPUT_DEVICE_TABLET_PAD:
+	  break;
+	default:
+	  return;
 	}
 
-	if (mapped_output && strcmp(mapped_output, output->name) == 0) {
-		wlr_cursor_map_input_to_output(cursor, device, output);
-	}
+	if (!phoc_output_is_builtin (output))
+	  return;
+
+	g_debug ("Mapping %s to %s", device->name, output->wlr_output->name);
+	wlr_cursor_map_input_to_output(cursor, device, output->wlr_output);
 }
 
 void roots_seat_configure_cursor(struct roots_seat *seat) {
         PhocServer *server = phoc_server_get_default ();
-	struct roots_config *config = seat->input->config;
 	PhocDesktop *desktop = server->desktop;
 	struct wlr_cursor *cursor = seat->cursor->cursor;
 
@@ -483,29 +477,18 @@ void roots_seat_configure_cursor(struct roots_seat *seat) {
 	}
 
 	// configure device to output mappings
-	const char *mapped_output = NULL;
-	struct roots_cursor_config *cc =
-		roots_config_get_cursor(config, seat->seat->name);
-	if (cc != NULL) {
-		mapped_output = cc->mapped_output;
-	}
 	wl_list_for_each(output, &desktop->outputs, link) {
-		if (mapped_output &&
-				strcmp(mapped_output, output->wlr_output->name) == 0) {
-			wlr_cursor_map_to_output(cursor, output->wlr_output);
-		}
-
 		wl_list_for_each(pointer, &seat->pointers, link) {
 			seat_set_device_output_mappings(seat, pointer->device,
-				output->wlr_output);
+				output);
 		}
 		wl_list_for_each(tablet, &seat->tablets, link) {
 			seat_set_device_output_mappings(seat, tablet->device,
-				output->wlr_output);
+				output);
 		}
 		wl_list_for_each(touch, &seat->touch, link) {
 			seat_set_device_output_mappings(seat, touch->device,
-				output->wlr_output);
+				output);
 		}
 	}
 }
@@ -922,7 +905,7 @@ static void seat_add_switch(struct roots_seat *seat,
 }
 
 static void handle_touch_destroy(struct wl_listener *listener, void *data) {
-	struct roots_pointer *touch =
+	struct roots_touch *touch =
 		wl_container_of(listener, touch, device_destroy);
 	struct roots_seat *seat = touch->seat;
 
