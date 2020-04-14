@@ -52,6 +52,34 @@ log_glib(enum wlr_log_importance verbosity, const char *fmt, va_list args) {
   g_logv("phoc-wlroots", level, fmt, args);
 }
 
+
+static GDebugKey debug_keys[] =
+{
+ { .key = "damage-tracking",
+   .value = PHOC_SERVER_DEBUG_FLAG_DAMAGE_TRACKING,
+ },
+ { .key = "touch-points",
+   .value = PHOC_SERVER_DEBUG_FLAG_TOUCH_POINTS,
+ },
+};
+
+
+static PhocServerDebugFlags
+parse_debug_env (void)
+{
+  const char *debugenv;
+  PhocServerDebugFlags flags = PHOC_SERVER_DEBUG_FLAG_NONE;
+
+  debugenv = g_getenv("PHOC_DEBUG");
+  if (!debugenv)
+    return flags;
+
+  return g_parse_debug_string(debugenv,
+			      debug_keys,
+			      G_N_ELEMENTS (debug_keys));
+}
+
+
 int
 main(int argc, char **argv)
 {
@@ -61,8 +89,7 @@ main(int argc, char **argv)
   g_autoptr(PhocServer) server = NULL;
   g_autofree gchar *config_path = NULL;
   g_autofree gchar *exec = NULL;
-  gboolean debug_damage = false;
-  gboolean debug_touch = false;
+  PhocServerDebugFlags debug_flags = PHOC_SERVER_DEBUG_FLAG_NONE;
 
   setup_signals();
 
@@ -71,10 +98,6 @@ main(int argc, char **argv)
      "Path to the configuration file. (default: phoc.ini).", NULL},
     {"exec", 'E', 0, G_OPTION_ARG_STRING, &exec,
      "Command (session) that will be ran at startup", NULL},
-    {"damage-tracking", 'D', 0, G_OPTION_ARG_NONE, &debug_damage,
-     "Enable damage tracking debugging", NULL},
-    {"touch-debug", 't', 0, G_OPTION_ARG_NONE, &debug_touch,
-     "Enable touch point visualization", NULL},
     { NULL, 0, 0, G_OPTION_ARG_NONE, NULL, NULL, NULL }
   };
 
@@ -86,11 +109,12 @@ main(int argc, char **argv)
     return 1;
   }
 
+  debug_flags = parse_debug_env ();
   wlr_log_init(WLR_DEBUG, log_glib);
   server = phoc_server_get_default ();
 
   loop = g_main_loop_new (NULL, FALSE);
-  if (!phoc_server_setup (server, config_path, exec, loop, debug_damage, debug_touch))
+  if (!phoc_server_setup (server, config_path, exec, loop, debug_flags))
     return 1;
 
   g_main_loop_run (loop);
