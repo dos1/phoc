@@ -68,12 +68,12 @@ wayland_event_source_new (struct wl_display *display)
 }
 
 static void
-phoc_wayland_init (PhocServer *server)
+phoc_wayland_init (PhocServer *self)
 {
   GSource *wayland_event_source;
 
-  wayland_event_source = wayland_event_source_new (server->wl_display);
-  g_source_attach (wayland_event_source, NULL);
+  wayland_event_source = wayland_event_source_new (self->wl_display);
+  self->wl_source = g_source_attach (wayland_event_source, NULL);
 }
 
 
@@ -136,7 +136,7 @@ phoc_server_constructed (GObject *object)
 
   self->backend = wlr_backend_autocreate(self->wl_display, NULL);
   if (self->backend == NULL)
-    g_error("Could not start backend");
+    g_error("Could not create backend");
 
   self->renderer = wlr_backend_get_renderer(self->backend);
   if (self->renderer == NULL)
@@ -155,17 +155,34 @@ phoc_server_dispose (GObject *object)
 {
   PhocServer *self = PHOC_SERVER (object);
 
-#ifdef PHOC_XWAYLAND
-  // We need to shutdown Xwayland before disconnecting all clients, otherwise
-  // wlroots will restart it automatically.
-  g_clear_pointer (&self->desktop->xwayland, wlr_xwayland_destroy);
-#endif
+  if (self->backend) {
+    wl_display_destroy_clients (self->wl_display);
+    wlr_backend_destroy(self->backend);
+    self->backend = NULL;
+  }
 
-  g_clear_pointer (&self->wl_display, &wl_display_destroy_clients);
-  g_clear_pointer (&self->wl_display, &wl_display_destroy);
+  G_OBJECT_CLASS (phoc_server_parent_class)->dispose (object);
+}
+
+static void
+phoc_server_finalize (GObject *object)
+{
+  PhocServer *self = PHOC_SERVER (object);
+
+  if (self->wl_source) {
+    g_source_remove (self->wl_source);
+    self->wl_source = 0;
+  }
   g_clear_object (&self->desktop);
   g_clear_pointer (&self->session, g_free);
 
+  if (self->inited) {
+    g_unsetenv("WAYLAND_DISPLAY");
+    g_unsetenv("_WAYLAND_DISPLAY");
+    self->inited = FALSE;
+  }
+
+  wl_display_destroy (self->wl_display);
   G_OBJECT_CLASS (phoc_server_parent_class)->finalize (object);
 }
 
@@ -176,7 +193,8 @@ phoc_server_class_init (PhocServerClass *klass)
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
   object_class->constructed = phoc_server_constructed;
-  object_class->finalize = phoc_server_dispose;
+  object_class->finalize = phoc_server_finalize;
+  object_class->dispose = phoc_server_dispose;
 }
 
 static void
@@ -188,16 +206,11 @@ PhocServer *
 phoc_server_get_default (void)
 {
   static PhocServer *instance;
-  static gboolean initialized;
 
   if (G_UNLIKELY (instance == NULL)) {
-    if (G_UNLIKELY (initialized)) {
-      g_error ("PhocServer can only be initialized once");
-    }
     g_debug("Creating server");
     instance = g_object_new (PHOC_TYPE_SERVER, NULL);
     g_object_add_weak_pointer (G_OBJECT (instance), (gpointer *)&instance);
-    initialized = TRUE;
   }
 
   return instance;
@@ -212,54 +225,57 @@ phoc_server_get_default (void)
  * Returns: %TRUE on success, %FALSE otherwise
  */
 gboolean
-phoc_server_setup (PhocServer *server, const char *config_path,
+phoc_server_setup (PhocServer *self, const char *config_path,
 		   const char *session, GMainLoop *mainloop,
 		   PhocServerDebugFlags debug_flags)
 {
-  server->config = roots_config_create(config_path);
-  if (!server->config) {
+  g_assert (!self->inited);
+
+  self->config = roots_config_create(config_path);
+  if (!self->config) {
     g_warning("Failed to parse config");
     return FALSE;
   }
 
-  server->mainloop = mainloop;
-  server->exit_status = 1;
-  server->desktop = phoc_desktop_new (server->config);
-  server->input = input_create(server->config);
-  server->session = g_strdup (session);
-  server->mainloop = mainloop;
-  server->debug_flags = debug_flags;
+  self->mainloop = mainloop;
+  self->exit_status = 1;
+  self->desktop = phoc_desktop_new (self->config);
+  self->input = input_create(self->config);
+  self->session = g_strdup (session);
+  self->mainloop = mainloop;
+  self->debug_flags = debug_flags;
 
-  const char *socket = wl_display_add_socket_auto(server->wl_display);
+  const char *socket = wl_display_add_socket_auto(self->wl_display);
   if (!socket) {
     g_warning("Unable to open wayland socket: %s", strerror(errno));
-    wlr_backend_destroy(server->backend);
+    wlr_backend_destroy(self->backend);
     return FALSE;
   }
 
   g_info("Running compositor on wayland display '%s'", socket);
   setenv("_WAYLAND_DISPLAY", socket, true);
 
-  if (!wlr_backend_start(server->backend)) {
+  if (!wlr_backend_start(self->backend)) {
     g_warning("Failed to start backend");
-    wlr_backend_destroy(server->backend);
-    wl_display_destroy(server->wl_display);
+    wlr_backend_destroy(self->backend);
+    wl_display_destroy(self->wl_display);
     return FALSE;
   }
 
   setenv("WAYLAND_DISPLAY", socket, true);
 #ifdef PHOC_XWAYLAND
-  if (server->desktop->xwayland != NULL) {
+  if (self->desktop->xwayland != NULL) {
     struct roots_seat *xwayland_seat =
-      input_get_seat(server->input, ROOTS_CONFIG_DEFAULT_SEAT_NAME);
-    wlr_xwayland_set_seat(server->desktop->xwayland, xwayland_seat->seat);
+      input_get_seat(self->input, ROOTS_CONFIG_DEFAULT_SEAT_NAME);
+    wlr_xwayland_set_seat(self->desktop->xwayland, xwayland_seat->seat);
   }
 #endif
 
-  phoc_wayland_init (server);
-  if (server->session)
-    phoc_startup_session (server);
+  phoc_wayland_init (self);
+  if (self->session)
+    phoc_startup_session (self);
 
+  self->inited = TRUE;
   return TRUE;
 }
 

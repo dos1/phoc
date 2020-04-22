@@ -36,6 +36,7 @@ struct _PhocServer {
   PhocDesktop *desktop;
   struct roots_input *input;
   PhocServerDebugFlags debug_flags;
+  gboolean inited;
 
   /* The session */
   gchar *session;
@@ -44,6 +45,7 @@ struct _PhocServer {
 
   /* Wayland resources */
   struct wl_display *wl_display;
+  guint wl_source;
 
   /* WLR tools */
   struct wlr_backend *backend;
