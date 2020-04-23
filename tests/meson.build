@@ -22,14 +22,23 @@ test_link_args = [
   '-fPIC',
 ]
 
-test_deps = [
-  phoc_lib,
-]
-
 tests = [
   'server',
   'run',
+  'client',
+  'layer-shell',
 ]
+
+phoctest_sources = [
+  'testlib.c',
+]
+
+phoctest_lib = static_library('phoctest', phoctest_sources,
+  c_args: test_cflags,
+  dependencies: [phoc_dep, client_protos])
+phoctest_dep = declare_dependency(
+  include_directories: include_directories('.'),
+  link_with: phoctest_lib)
 
 # Unit tests
 foreach test : tests
@@ -38,7 +47,7 @@ foreach test : tests
                  c_args: test_cflags,
                  pie: true,
                  link_args: test_link_args,
-                 dependencies: phoc_dep)
+                 dependencies: [phoctest_dep, phoc_dep, client_protos])
   test(test, t, env: test_env)
 endforeach
 
