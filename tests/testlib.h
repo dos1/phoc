@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: GPL-3.0+
  * Author: Guido Günther <agx@sigxcpu.org>
  */
+#include "server.h"
 
 #include <glib.h>
+#include "xdg-shell-client-protocol.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
 #include "wlr-screencopy-unstable-v1-client-protocol.h"
 
@@ -34,6 +36,7 @@ typedef struct _PhocTestWlGlobals {
   struct wl_display *display;
   struct wl_compositor *compositor;
   struct wl_shm *shm;
+  struct xdg_wm_base *xdg_shell;
   struct zwlr_layer_shell_v1 *layer_shell;
   struct zwlr_screencopy_manager_v1 *screencopy_manager;
   /* TODO: handle multiple outputs */
@@ -42,9 +45,12 @@ typedef struct _PhocTestWlGlobals {
   guint32 formats;
 } PhocTestClientGlobals;
 
+typedef gboolean (* PhocTestServerFunc) (PhocServer *server, gpointer data);
 typedef gboolean (* PhocTestClientFunc) (PhocTestClientGlobals *globals, gpointer data);
 
 typedef struct PhocTestClientIface {
+  /* Prepare function runs in server context */
+  PhocTestServerFunc server_prepare;
   PhocTestClientFunc client_run;
 } PhocTestClientIface;
 
