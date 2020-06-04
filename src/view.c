@@ -316,6 +316,12 @@ void view_arrange_maximized(struct roots_view *view, struct wlr_output *output) 
 			usable_area.width / view->scale, usable_area.height / view->scale);
 }
 
+
+/* Margin between windows */
+#define WIN_TILE_MARGIN 3
+/* Margin to screen edge */
+#define EDGE_TILE_MARGIN (2 * WIN_TILE_MARGIN)
+
 void
 view_arrange_tiled (struct roots_view *view, struct wlr_output *output)
 {
@@ -331,29 +337,33 @@ view_arrange_tiled (struct roots_view *view, struct wlr_output *output)
   PhocOutput *phoc_output = output->data;
   struct wlr_box *output_box = wlr_output_layout_get_box (view->desktop->layout, output);
   struct wlr_box usable_area = phoc_output->usable_area;
-  int x;
+  int x, width;
 
   usable_area.x += output_box->x;
   usable_area.y += output_box->y;
 
   switch (view->tile_direction) {
   case PHOC_VIEW_TILE_LEFT:
-    x = usable_area.x;
+    x = usable_area.x + EDGE_TILE_MARGIN;
     break;
   case PHOC_VIEW_TILE_RIGHT:
-    x = usable_area.x + (0.5 * usable_area.width);
+    x = usable_area.x + (0.5 * usable_area.width) + WIN_TILE_MARGIN;
     break;
   default:
     g_error ("Invalid tiling direction %d", view->tile_direction);
   }
 
+  width = usable_area.width / 2 - (EDGE_TILE_MARGIN + WIN_TILE_MARGIN);
   /*
    * No need to take geometry into account since maximized surfaces
    * usually don't have drop shadows. It wouldn't be up to date here
    * yet anyway since a client's configure is not yet processed.
    */
-  view_move_resize (view, x, usable_area.y,
-                    usable_area.width / 2, usable_area.height);
+  view_move_resize (view,
+                    x,
+                    usable_area.y + EDGE_TILE_MARGIN,
+                    width,
+                    usable_area.height - (2 * EDGE_TILE_MARGIN));
 }
 
 /*
