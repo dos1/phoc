@@ -7,10 +7,14 @@
 
 #include <glib.h>
 #include "xdg-shell-client-protocol.h"
+#include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
 #include "wlr-screencopy-unstable-v1-client-protocol.h"
+#include "phosh-private-client-protocol.h"
 
 G_BEGIN_DECLS
+
+typedef struct _PhocTestWlGlobals PhocTestClientGlobals;
 
 typedef struct _PhocTestBuffer {
   struct wl_buffer *wl_buffer;
@@ -20,16 +24,18 @@ typedef struct _PhocTestBuffer {
   gboolean valid;
 } PhocTestBuffer;
 
+typedef struct _PhocTestScreencopyFrame {
+  struct zwlr_screencopy_frame_v1 *handle;
+  PhocTestBuffer buffer;
+  gboolean done;
+  uint32_t flags;
+  PhocTestClientGlobals *globals;
+} PhocTestScreencopyFrame;
+
 typedef struct _PhocTestOutput {
   struct wl_output *output;
-
   guint32 width, height;
-
-  /* for screenshots of this output */
-  struct zwlr_screencopy_frame_v1 *screencopy_frame;
-  PhocTestBuffer screenshot;
-  gboolean screenshot_done;
-  uint32_t screencopy_frame_flags;
+  PhocTestScreencopyFrame screenshot;
 } PhocTestOutput;
 
 typedef struct _PhocTestWlGlobals {
@@ -39,11 +45,20 @@ typedef struct _PhocTestWlGlobals {
   struct xdg_wm_base *xdg_shell;
   struct zwlr_layer_shell_v1 *layer_shell;
   struct zwlr_screencopy_manager_v1 *screencopy_manager;
+  struct zwlr_foreign_toplevel_manager_v1 *foreign_toplevel_manager;
+  GSList *foreign_toplevels;
+  struct phosh_private *phosh;
   /* TODO: handle multiple outputs */
   PhocTestOutput output;
 
   guint32 formats;
 } PhocTestClientGlobals;
+
+typedef struct _PhocTestForeignToplevel {
+    char* title;
+    struct zwlr_foreign_toplevel_handle_v1 *handle;
+    PhocTestClientGlobals *globals;
+} PhocTestForeignToplevel;
 
 typedef gboolean (* PhocTestServerFunc) (PhocServer *server, gpointer data);
 typedef gboolean (* PhocTestClientFunc) (PhocTestClientGlobals *globals, gpointer data);
@@ -59,8 +74,13 @@ void phoc_test_client_run (gint timeout, PhocTestClientIface *iface, gpointer da
 int  phoc_test_client_create_shm_buffer (PhocTestClientGlobals *globals,
 					 PhocTestBuffer *buffer,
 					 int width, int height, guint32 format);
-PhocTestBuffer *phoc_test_client_capture_output(PhocTestClientGlobals *globals,
-						PhocTestOutput *output);
+PhocTestBuffer *phoc_test_client_capture_frame (PhocTestClientGlobals *globals,
+						PhocTestScreencopyFrame *frame,
+						struct zwlr_screencopy_frame_v1 *handle);
+PhocTestBuffer *phoc_test_client_capture_output (PhocTestClientGlobals *globals,
+						 PhocTestOutput *output);
+PhocTestForeignToplevel *phoc_test_client_get_foreign_toplevel_handle (PhocTestClientGlobals *globals,
+								       const char *title);
 
 /* Buffers */
 gboolean phoc_test_buffer_equal (PhocTestBuffer *buf1, PhocTestBuffer *buf2);
@@ -81,7 +101,7 @@ void phoc_test_buffer_free (PhocTestBuffer *buffer);
     PhocTestBuffer *__s = phoc_test_client_capture_output (__g, &__g->output); \
     if (phoc_test_buffer_matches_screenshot (__s, __f)) ; else {         \
       g_autofree gchar *__name = _phoc_test_screenshot_name(__LINE__, G_STRFUNC, 0); \
-      phoc_test_buffer_save (&__g->output.screenshot, __name);		 \
+      phoc_test_buffer_save (&__g->output.screenshot.buffer, __name);		 \
       g_assertion_message (G_LOG_DOMAIN, __FILE__, __LINE__, G_STRFUNC,	 \
 			   "Output content does not match " #f);         \
     }                                                                    \
