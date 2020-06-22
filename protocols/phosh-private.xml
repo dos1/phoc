@@ -36,6 +36,13 @@
       <arg name="max_width" type="uint" />
       <arg name="max_height" type="uint" />
     </request>
+
+    <event name="keysym_event" since="4">
+      <description summary="Report a keysym">
+	Forward a xkb keysym to the client
+      </description>
+      <arg name="keysym" type="uint" summary="The forwarded keysym"/>
+    </event>
   </interface>
 
   <!-- application switch/close handling -->

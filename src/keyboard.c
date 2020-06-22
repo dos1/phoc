@@ -196,6 +196,9 @@ keyboard_execute_compositor_binding(PhocKeyboard *self,
     roots_seat_end_compositor_grab(self->seat);
   }
 
+  if (phosh_forward_keysym (keysym))
+    return true;
+
   return false;
 }
 

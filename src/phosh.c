@@ -389,3 +389,21 @@ phosh_private_screencopy_frame_from_resource (struct wl_resource *resource)
                                    &phosh_private_screencopy_frame_impl));
   return wl_resource_get_user_data (resource);
 }
+
+bool
+phosh_forward_keysym (xkb_keysym_t keysym)
+{
+  PhocServer *server = phoc_server_get_default ();
+  struct phosh_private *phosh = server->desktop->phosh;
+
+  /* TODO: use input event codes,support modifiers, allow client to seletc
+     events, add timestamp, ... */
+  if (keysym == XKB_KEY_XF86AudioLowerVolume ||
+      keysym == XKB_KEY_XF86AudioRaiseVolume ||
+      keysym == XKB_KEY_XF86AudioMute) {
+    phosh_private_send_keysym_event (phosh->resource, keysym);
+    return true;
+  }
+
+  return false;
+}
