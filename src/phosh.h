@@ -55,3 +55,4 @@ void phosh_destroy(struct phosh_private *shell);
 struct phosh_private *phosh_private_from_resource(struct wl_resource *resource);
 struct phosh_private_xdg_switcher *phosh_private_xdg_switcher_from_resource(struct wl_resource *resource);
 struct phosh_private_screencopy_frame *phosh_private_screencopy_frame_from_resource(struct wl_resource *resource);
+bool   phosh_forward_keysym (xkb_keysym_t keysym);
