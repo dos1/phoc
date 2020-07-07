@@ -26,6 +26,12 @@
 #define TOUCH_POINT_RADIUS 30
 #define TOUCH_POINT_BORDER 0.1
 
+#define COLOR_BLACK                {0.0f, 0.0f, 0.0f, 1.0f}
+#define COLOR_TRANSPARENT          {0.0f, 0.0f, 0.0f, 0.0f}
+#define COLOR_TRANSPARENT_WHITE    {0.5f, 0.5f, 0.5f, 0.5f}
+#define COLOR_TRANSPARENT_YELLOW   {0.5f, 0.5f, 0.0f, 0.5f}
+#define COLOR_TRANSPARENT_MAGENTA  {0.5f, 0.0f, 0.5f, 0.5f}
+
 struct render_data {
 	pixman_region32_t *damage;
 	float alpha;
@@ -96,7 +102,7 @@ static void
 collect_touch_points (struct roots_output *output, struct wlr_surface *surface, struct wlr_box box, float scale)
 {
   PhocServer *server = phoc_server_get_default ();
-  if (!(server->debug_flags & PHOC_SERVER_DEBUG_FLAG_TOUCH_POINTS)) {
+  if (G_LIKELY (!(server->debug_flags & PHOC_SERVER_DEBUG_FLAG_TOUCH_POINTS))) {
     return;
   }
 
@@ -348,14 +354,14 @@ render_touch_point_cb (gpointer data, gpointer user_data)
   wlr_render_ellipse (renderer, &point_box, color, wlr_output->transform_matrix);
 
   point_box = wlr_box_from_touch_point (touch_point, TOUCH_POINT_RADIUS * (1.0 - TOUCH_POINT_BORDER) * wlr_output->scale);
-  wlr_render_ellipse(renderer, &point_box, (float[]){0.5, 0.5, 0.5, 0.5}, wlr_output->transform_matrix);
+  wlr_render_ellipse(renderer, &point_box, (float[])COLOR_TRANSPARENT_WHITE, wlr_output->transform_matrix);
 }
 
 static void
 render_touch_points (struct roots_output *output)
 {
   PhocServer *server = phoc_server_get_default ();
-  if (!(server->debug_flags & PHOC_SERVER_DEBUG_FLAG_TOUCH_POINTS)) {
+  if (G_LIKELY (!(server->debug_flags & PHOC_SERVER_DEBUG_FLAG_TOUCH_POINTS))) {
     return;
   }
   g_list_foreach (output->debug_touch_points, render_touch_point_cb, output);
@@ -435,7 +441,7 @@ view_render_to_buffer (struct roots_view *view, int width, int height, int strid
   glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
 
   wlr_renderer_begin (server->renderer, width, height);
-  wlr_renderer_clear (server->renderer, (float[]){0.0, 0.0, 0.0, 0.0});
+  wlr_renderer_clear (server->renderer, (float[])COLOR_TRANSPARENT);
   wlr_surface_for_each_surface (surface, view_render_iterator, view);
   wlr_renderer_end (server->renderer);
 
@@ -468,7 +474,7 @@ void output_render(struct roots_output *output) {
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
-	float clear_color[] = {0.0f, 0.0f, 0.0f, 1.0f};
+	float clear_color[] = COLOR_BLACK;
 
 	const struct wlr_box *output_box =
 		wlr_output_layout_get_box(desktop->layout, wlr_output);
@@ -520,6 +526,18 @@ void output_render(struct roots_output *output) {
 		.alpha = 1.0,
 	};
 
+	enum wl_output_transform transform =
+		wlr_output_transform_invert(wlr_output->transform);
+
+	if (G_UNLIKELY (server->debug_flags & PHOC_SERVER_DEBUG_FLAG_DAMAGE_TRACKING)) {
+		pixman_region32_union_rect(&buffer_damage, &buffer_damage,
+			0, 0, wlr_output->width, wlr_output->height);
+		wlr_region_transform(&buffer_damage, &buffer_damage,
+			transform, wlr_output->width, wlr_output->height);
+		needs_frame |= pixman_region32_not_empty(&output->damage->current);
+		needs_frame |= pixman_region32_not_empty(&output->damage->previous[output->damage->previous_idx]);
+	}
+
 	if (!needs_frame) {
 		// Output doesn't need swap and isn't damaged, skip rendering completely
 		wlr_output_rollback(wlr_output);
@@ -531,10 +549,6 @@ void output_render(struct roots_output *output) {
 	if (!pixman_region32_not_empty(&buffer_damage)) {
 		// Output isn't damaged but needs buffer swap
 		goto renderer_end;
-	}
-
-	if (server->debug_flags & PHOC_SERVER_DEBUG_FLAG_DAMAGE_TRACKING) {
-		wlr_renderer_clear(renderer, (float[]){1, 1, 0, 1});
 	}
 
 	int nrects;
@@ -597,23 +611,38 @@ renderer_end:
 
 	render_touch_points (output);
 
-	wlr_renderer_end(renderer);
-
 	int width, height;
 	wlr_output_transformed_resolution(wlr_output, &width, &height);
 
 	pixman_region32_t frame_damage;
 	pixman_region32_init(&frame_damage);
 
-	enum wl_output_transform transform =
-		wlr_output_transform_invert(wlr_output->transform);
 	wlr_region_transform(&frame_damage, &output->damage->current,
 		transform, width, height);
 
-	if (server->debug_flags & PHOC_SERVER_DEBUG_FLAG_DAMAGE_TRACKING) {
-		pixman_region32_union_rect(&frame_damage, &frame_damage,
-			0, 0, wlr_output->width, wlr_output->height);
+	if (G_UNLIKELY (server->debug_flags & PHOC_SERVER_DEBUG_FLAG_DAMAGE_TRACKING)) {
+		pixman_region32_t previous_damage;
+		pixman_region32_init(&previous_damage);
+		pixman_region32_subtract(&previous_damage,
+			&output->damage->previous[output->damage->previous_idx], &output->damage->current);
+
+		struct wlr_box box;
+		rects = pixman_region32_rectangles(&previous_damage, &nrects);
+		for (int i = 0; i < nrects; ++i) {
+			wlr_box_from_pixman_box32(&box, rects[i]);
+			wlr_render_rect(renderer, &box, (float[])COLOR_TRANSPARENT_MAGENTA, wlr_output->transform_matrix);
+		}
+
+		rects = pixman_region32_rectangles(&output->damage->current, &nrects);
+		for (int i = 0; i < nrects; ++i) {
+			wlr_box_from_pixman_box32(&box, rects[i]);
+			wlr_render_rect(renderer, &box, (float[])COLOR_TRANSPARENT_YELLOW, wlr_output->transform_matrix);
+		}
+		wlr_output_schedule_frame(output->wlr_output);
+		pixman_region32_fini(&previous_damage);
 	}
+
+	wlr_renderer_end(renderer);
 
 	wlr_output_set_damage(wlr_output, &frame_damage);
 	pixman_region32_fini(&frame_damage);
