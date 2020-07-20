@@ -10,12 +10,14 @@
 #include <wlr/backend.h>
 #include <wlr/config.h>
 #include <wlr/render/wlr_renderer.h>
+#include <wlr/render/gles2.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_matrix.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_linux_dmabuf_v1.h>
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
+#include <wlr/version.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 #include "layers.h"
@@ -285,9 +287,13 @@ static bool scan_out_fullscreen_view(struct roots_output *output) {
 
 	wlr_presentation_surface_sampled(output->desktop->presentation, surface);
 
+#if WLR_VERSION_MAJOR == 0 && WLR_VERSION_MINOR < 11
 	if (!wlr_output_attach_buffer(wlr_output, surface->buffer)) {
 		return false;
 	}
+#else
+	wlr_output_attach_buffer(wlr_output, &surface->buffer->base);
+#endif
 	return wlr_output_commit(wlr_output);
 }
 
@@ -433,7 +439,12 @@ view_render_to_buffer (struct roots_view *view, int width, int height, int strid
 {
   PhocServer *server = phoc_server_get_default ();
   struct wlr_surface *surface = view->wlr_surface;
+  struct wlr_egl *egl = wlr_gles2_renderer_get_egl (server->renderer);
   GLuint tex, fbo;
+
+  if (!wlr_egl_make_current (egl, EGL_NO_SURFACE, NULL)) {
+    return;
+  }
 
   glGenTextures (1, &tex);
   glBindTexture (GL_TEXTURE_2D, tex);
@@ -454,6 +465,10 @@ view_render_to_buffer (struct roots_view *view, int width, int height, int strid
   glDeleteFramebuffers (1, &fbo);
   glDeleteTextures (1, &tex);
   glBindFramebuffer (GL_FRAMEBUFFER, 0);
+
+#if WLR_VERSION_MAJOR > 0 || WLR_VERSION_MINOR >= 11
+  wlr_egl_unset_current (egl);
+#endif
 }
 
 static void surface_send_frame_done_iterator(struct roots_output *output,
