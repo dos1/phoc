@@ -2,6 +2,7 @@ include:
  - 'https://source.puri.sm/Librem5/librem5-ci/raw/master/librem5-pipeline-definitions.yml'
 
 stages:
+ - check
  - build
  - test
  - package
@@ -182,3 +183,9 @@ lintian-debian-buster-package:
     - package-deb-with-wlroots
   extends: .l5-lintian-debian-package
 
+version-check:
+  stage: check
+  dependencies: []
+  <<: *tags
+  script:
+    - echo "Checking whether version numbers match..." && [ $(head -n1 debian/changelog | egrep -o '([0-9]\.?)+') == $(grep '\sversion:\s' meson.build | head -n1 | egrep -o '([0-9]\.?)+') ]
