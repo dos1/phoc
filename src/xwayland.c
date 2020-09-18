@@ -13,6 +13,7 @@
 #include <wlr/xwayland.h>
 #include "server.h"
 #include "view.h"
+#include "xwayland.h"
 
 static void activate(struct roots_view *view, bool active) {
 	struct wlr_xwayland_surface *xwayland_surface =
@@ -28,11 +29,14 @@ static void move(struct roots_view *view, double x, double y) {
 		xwayland_surface->width, xwayland_surface->height);
 }
 
-static void apply_size_constraints(
+static void apply_size_constraints(struct roots_view *view,
 		struct wlr_xwayland_surface *xwayland_surface, uint32_t width,
 		uint32_t height, uint32_t *dest_width, uint32_t *dest_height) {
 	*dest_width = width;
 	*dest_height = height;
+
+	if (view_is_maximized(view))
+		return;
 
 	struct wlr_xwayland_surface_size_hints *size_hints =
 		xwayland_surface->size_hints;
@@ -57,7 +61,7 @@ static void resize(struct roots_view *view, uint32_t width, uint32_t height) {
 		roots_xwayland_surface_from_view(view)->xwayland_surface;
 
 	uint32_t constrained_width, constrained_height;
-	apply_size_constraints(xwayland_surface, width, height, &constrained_width,
+	apply_size_constraints(view, xwayland_surface, width, height, &constrained_width,
 		&constrained_height);
 
 	wlr_xwayland_surface_configure(xwayland_surface, xwayland_surface->x,
@@ -73,7 +77,7 @@ static void move_resize(struct roots_view *view, double x, double y,
 	bool update_y = y != view->box.y;
 
 	uint32_t constrained_width, constrained_height;
-	apply_size_constraints(xwayland_surface, width, height, &constrained_width,
+	apply_size_constraints(view, xwayland_surface, width, height, &constrained_width,
 		&constrained_height);
 
 	if (update_x) {
@@ -106,7 +110,19 @@ static bool want_scaling(struct roots_view *view) {
 }
 
 static bool want_auto_maximize(struct roots_view *view) {
-	return false;
+	PhocServer *server = phoc_server_get_default();
+	struct wlr_xwayland_surface *xwayland_surface =
+		roots_xwayland_surface_from_view(view)->xwayland_surface;
+
+	if (xwayland_surface->window_type == NULL)
+		return true;
+
+	for (guint i = 0; i < xwayland_surface->window_type_len; i++)
+		if (xwayland_surface->window_type[i] != server->desktop->xwayland_atoms[NET_WM_WINDOW_TYPE_NORMAL] &&
+		    xwayland_surface->window_type[i] != server->desktop->xwayland_atoms[NET_WM_WINDOW_TYPE_DIALOG])
+			return false;
+
+	return true;
 }
 
 static void maximize(struct roots_view *view, bool maximized) {
@@ -289,6 +305,9 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	wl_signal_add(&surface->surface->events.commit,
 		&roots_surface->surface_commit);
 
+	view_maximize(view, surface->maximized_horz && surface->maximized_vert);
+	view_auto_maximize(view);
+
 	view_map(view, surface->surface);
 
 	if (!surface->override_redirect) {
@@ -331,6 +350,8 @@ void handle_xwayland_surface(struct wl_listener *listener, void *data) {
 	view_init(&roots_surface->view, &view_impl, ROOTS_XWAYLAND_VIEW, desktop);
 	roots_surface->view.box.x = surface->x;
 	roots_surface->view.box.y = surface->y;
+	roots_surface->view.box.width = surface->width;
+	roots_surface->view.box.height = surface->height;
 	roots_surface->xwayland_surface = surface;
 
 	view_set_title(&roots_surface->view, surface->title);
