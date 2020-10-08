@@ -1,3 +1,9 @@
 #!/bin/bash
 
+if [ -z "$1" ]; then
+  echo "Find the Wayland application ID for an executable"
+  echo "Usage: $0 EXECUTABLE"
+  exit 0
+fi
+
 WAYLAND_DEBUG=client timeout 10.0s $1 2>&1 | grep -i app_id
