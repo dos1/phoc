@@ -4,16 +4,21 @@ set -e
 
 export GSETTINGS_SCHEMA_DIR=_build/data/
 
-case "$1" in
-	on|1|ON)
+if [ -z "$1" ]; then
+  echo -n "Auto-maximize is currently "
+  echo "To change: $0 VALUE"
+else
+  case "$1" in
+	on|1|ON|true)
 	val=true
 	;;
 	*)
 	val=false
 	;;
-esac
+  esac
 
-gsettings set sm.puri.phoc auto-maximize "${val}"
+  gsettings set sm.puri.phoc auto-maximize "${val}"
 
-echo -n "Auto-maximize is now "
+  echo -n "Auto-maximize updated to "
+fi
 G_MESSAGES_DEBUG= gsettings get sm.puri.phoc auto-maximize
