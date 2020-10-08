@@ -1,0 +1,3 @@
+#!/bin/bash
+
+WAYLAND_DEBUG=client timeout 10.0s $1 2>&1 | grep -i app_id
