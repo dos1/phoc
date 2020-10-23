@@ -537,6 +537,8 @@ void handle_output_manager_apply(struct wl_listener *listener, void *data) {
 		}
 		wlr_output_layout_add(desktop->layout, wlr_output,
 			config_head->state.x, config_head->state.y);
+		/* Make sure we rotate clockwise */
+		phoc_utils_fix_transform(&config_head->state.transform);
 		wlr_output_set_transform(wlr_output, config_head->state.transform);
 		wlr_output_set_scale(wlr_output, config_head->state.scale);
 		ok &= wlr_output_commit(wlr_output);
@@ -721,6 +723,8 @@ void handle_new_output(struct wl_listener *listener, void *data) {
 			}
 
 			wlr_output_set_scale(wlr_output, output_config->scale);
+			/* Make sure we rotate clockwise */
+			phoc_utils_fix_transform(&output_config->transform);
 			wlr_output_set_transform(wlr_output, output_config->transform);
 			wlr_output_layout_add(desktop->layout, wlr_output, output_config->x,
 				output_config->y);
