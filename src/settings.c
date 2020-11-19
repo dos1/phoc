@@ -204,8 +204,6 @@ static int config_ini_handler(void *user, const char *section, const char *name,
 			} else {
 				wlr_log(WLR_ERROR, "got unknown transform value: %s", value);
 			}
-			/* Make sure we rotate clockwise */
-			phoc_utils_fix_transform(&oc->transform);
 		} else if (strcmp(name, "mode") == 0) {
 			char *end;
 			oc->mode.width = strtol(value, &end, 10);
