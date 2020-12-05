@@ -178,9 +178,16 @@ static void handle_touch_down(struct wl_listener *listener, void *data) {
         PhocServer *server = phoc_server_get_default ();
 	struct roots_cursor *cursor =
 		wl_container_of(listener, cursor, touch_down);
-	PhocDesktop *desktop = server->desktop;
-	wlr_idle_notify_activity(desktop->idle, cursor->seat->seat);
 	struct wlr_event_touch_down *event = data;
+	PhocDesktop *desktop = server->desktop;
+	PhocOutput *output = g_hash_table_lookup (desktop->input_output_map,
+							   event->device->name);
+	if (output && !output->wlr_output->enabled) {
+		g_debug("Touch event ignored since output '%s' is disabled.",
+			output->wlr_output->name);
+		return;
+	}
+	wlr_idle_notify_activity(desktop->idle, cursor->seat->seat);
 	roots_cursor_handle_touch_down(cursor, event);
 }
 
@@ -188,20 +195,37 @@ static void handle_touch_up(struct wl_listener *listener, void *data) {
         PhocServer *server = phoc_server_get_default ();
 	struct roots_cursor *cursor =
 		wl_container_of(listener, cursor, touch_up);
-	PhocDesktop *desktop = server->desktop;
-	wlr_idle_notify_activity(desktop->idle, cursor->seat->seat);
 	struct wlr_event_touch_up *event = data;
+	PhocDesktop *desktop = server->desktop;
+	PhocOutput *output = g_hash_table_lookup (desktop->input_output_map,
+							   event->device->name);
+	/* handle touch up regardless of output status so events don't become stuck */
 	roots_cursor_handle_touch_up(cursor, event);
+	if (output && !output->wlr_output->enabled) {
+		g_debug("Touch event ignored since output '%s' is disabled.",
+			output->wlr_output->name);
+		return;
+	}
+	wlr_idle_notify_activity(desktop->idle, cursor->seat->seat);
 }
 
 static void handle_touch_motion(struct wl_listener *listener, void *data) {
         PhocServer *server = phoc_server_get_default ();
 	struct roots_cursor *cursor =
 		wl_container_of(listener, cursor, touch_motion);
-	PhocDesktop *desktop = server->desktop;
-	wlr_idle_notify_activity(desktop->idle, cursor->seat->seat);
 	struct wlr_event_touch_motion *event = data;
+	PhocDesktop *desktop = server->desktop;
+	PhocOutput *output = g_hash_table_lookup (desktop->input_output_map,
+							   event->device->name);
+	/* handle touch motion regardless of output status so events don't become
+	   stuck */
 	roots_cursor_handle_touch_motion(cursor, event);
+	if (output && !output->wlr_output->enabled) {
+		g_debug("Touch event ignored since output '%s' is disabled.",
+			output->wlr_output->name);
+		return;
+	}
+	wlr_idle_notify_activity(desktop->idle, cursor->seat->seat);
 }
 
 static void handle_tablet_tool_position(struct roots_cursor *cursor,
@@ -490,6 +514,12 @@ void roots_seat_configure_cursor(struct roots_seat *seat) {
 		wl_list_for_each(touch, &seat->touch, link) {
 			seat_set_device_output_mappings(seat, touch->device,
 				output);
+			g_debug("Added mapping for touch device '%s' to output '%s'",
+				touch->device->name,
+				output->wlr_output->name);
+			g_hash_table_insert (desktop->input_output_map,
+					     g_strdup (touch->device->name),
+					     output);
 		}
 	}
 }
@@ -907,13 +937,17 @@ static void seat_add_switch(struct roots_seat *seat,
 	wl_signal_add(&switch_device->device->switch_device->events.toggle, &switch_device->toggle);
 }
 
-static void handle_touch_destroy(struct wl_listener *listener, void *data) {
-	PhocTouch *touch = wl_container_of(listener, touch, device_destroy);
+static void
+handle_touch_destroy(PhocTouch *touch)
+{
 	struct roots_seat *seat = touch->seat;
+	PhocServer *server = phoc_server_get_default ();
+	PhocDesktop *desktop = server->desktop;
 
+	g_debug("Removing touch device: %s", touch->device->name);
+	g_hash_table_remove (desktop->input_output_map, touch->device->name);
 	wl_list_remove(&touch->link);
 	wlr_cursor_detach_input_device(seat->cursor->cursor, touch->device);
-	wl_list_remove(&touch->device_destroy.link);
 	g_object_unref (touch);
 
 	seat_update_capabilities(seat);
@@ -925,8 +959,9 @@ static void seat_add_touch(struct roots_seat *seat,
 
 	wl_list_insert(&seat->touch, &touch->link);
 
-	touch->device_destroy.notify = handle_touch_destroy;
-	wl_signal_add(&touch->device->events.destroy, &touch->device_destroy);
+	g_signal_connect(touch, "touch-destroyed",
+			 G_CALLBACK (handle_touch_destroy),
+			 NULL);
 
 	wlr_cursor_attach_input_device(seat->cursor->cursor, device);
 	roots_seat_configure_cursor(seat);
