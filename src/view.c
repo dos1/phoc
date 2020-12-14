@@ -503,13 +503,15 @@ view_tile(struct roots_view *view, PhocViewTileDirection direction)
 	  view->impl->maximize(view, true);
   }
 
-  /* backup window state */
-  view->state = PHOC_VIEW_STATE_TILED;
-  view->saved.x = view->box.x;
-  view->saved.y = view->box.y;
-  view->saved.rotation = view->rotation;
-  view->saved.width = view->box.width;
-  view->saved.height = view->box.height;
+  if (view->state == PHOC_VIEW_STATE_NORMAL) {
+    /* backup window state */
+    view->state = PHOC_VIEW_STATE_TILED;
+    view->saved.x = view->box.x;
+    view->saved.y = view->box.y;
+    view->saved.rotation = view->rotation;
+    view->saved.width = view->box.width;
+    view->saved.height = view->box.height;
+  }
 
   memcpy(&usable_area, &phoc_output->usable_area,
 	 sizeof(struct wlr_box));
