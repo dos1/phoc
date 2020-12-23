@@ -624,7 +624,7 @@ phoc_output_drag_icons_for_each_surface (PhocOutput *self, PhocInput *input,
 
 void
 phoc_output_for_each_surface (PhocOutput *self, roots_surface_iterator_func_t iterator, void
-                              *user_data)
+                              *user_data, gboolean visible_only)
 {
   PhocDesktop *desktop = self->desktop;
   PhocServer *server = phoc_server_get_default ();
@@ -647,7 +647,9 @@ phoc_output_for_each_surface (PhocOutput *self, roots_surface_iterator_func_t it
     struct roots_view *view;
     wl_list_for_each_reverse (view, &desktop->views, link)
     {
-      phoc_output_view_for_each_surface (self, view, iterator, user_data);
+      if (!visible_only || phoc_desktop_view_is_visible (desktop, view)) {
+        phoc_output_view_for_each_surface (self, view, iterator, user_data);
+      }
     }
   }
 
@@ -711,7 +713,11 @@ phoc_output_damage_whole (PhocOutput *self)
 static bool
 phoc_view_accept_damage (PhocOutput *self, struct roots_view   *view)
 {
+  PhocServer *server = phoc_server_get_default ();
   if (view->wlr_surface == NULL) {
+    return false;
+  }
+  if (!phoc_desktop_view_is_visible (server->desktop, view)) {
     return false;
   }
   if (self->fullscreen_view == NULL) {

@@ -610,10 +610,12 @@ void output_render(PhocOutput *output) {
 		render_layer(output, &buffer_damage,
 			&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM]);
 
-		// Render all views
 		struct roots_view *view;
+			// Render all views
 		wl_list_for_each_reverse(view, &desktop->views, link) {
-			render_view(output, view, &data);
+			if (phoc_desktop_view_is_visible(desktop, view)) {
+				render_view(output, view, &data);
+			}
 		}
 
 		// Render top layer above views
@@ -678,7 +680,7 @@ buffer_damage_finish:
 
 send_frame_done:
 	// Send frame done events to all surfaces
-	phoc_output_for_each_surface(output, surface_send_frame_done_iterator, &now);
+	phoc_output_for_each_surface(output, surface_send_frame_done_iterator, &now, true);
 
 	damage_touch_points(output);
 	g_list_free_full(output->debug_touch_points, g_free);

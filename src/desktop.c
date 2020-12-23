@@ -142,7 +142,7 @@ static struct roots_view *desktop_view_at(PhocDesktop *desktop,
 		double *sx, double *sy) {
 	struct roots_view *view;
 	wl_list_for_each(view, &desktop->views, link) {
-		if (view_at(view, lx, ly, surface, sx, sy)) {
+		if (phoc_desktop_view_is_visible(desktop, view) && view_at(view, lx, ly, surface, sx, sy)) {
 			return view;
 		}
 	}
@@ -189,7 +189,7 @@ static struct wlr_surface *layer_surface_at(struct wl_list *layer, double ox,
 	return NULL;
 }
 
-struct wlr_surface *desktop_surface_at(PhocDesktop *desktop,
+struct wlr_surface *phoc_desktop_surface_at(PhocDesktop *desktop,
 		double lx, double ly, double *sx, double *sy,
 		struct roots_view **view) {
 	struct wlr_surface *surface = NULL;
@@ -255,6 +255,45 @@ struct wlr_surface *desktop_surface_at(PhocDesktop *desktop,
 		}
 	}
 	return NULL;
+}
+
+gboolean
+phoc_desktop_view_is_visible (PhocDesktop *desktop, struct roots_view *view)
+{
+  g_assert_false (wl_list_empty (&desktop->views));
+
+  if (wl_list_length (&desktop->outputs) != 1) {
+    // current heuristics work well only for single output
+    return true;
+  }
+
+  if (!desktop->maximize) {
+    return true;
+  }
+
+  struct roots_view *top_view = wl_container_of (desktop->views.next, view, link);
+
+#ifdef PHOC_XWAYLAND
+  // XWayland parent relations can be complicated and aren't described by roots_view
+  // relationships very well at the moment, so just make all XWayland windows visible
+  // when some XWayland window is active for now
+  if (view->type == ROOTS_XWAYLAND_VIEW && top_view->type == ROOTS_XWAYLAND_VIEW) {
+    return true;
+  }
+#endif
+
+  struct roots_view *v = top_view;
+  while (v) {
+    if (v == view) {
+      return true;
+    }
+    if (view_is_maximized (v)) {
+      return false;
+    }
+    v = v->parent;
+  }
+
+  return false;
 }
 
 static void
@@ -363,7 +402,7 @@ static void handle_pointer_constraint(struct wl_listener *listener,
 	wl_signal_add(&wlr_constraint->events.destroy, &constraint->destroy);
 
 	double sx, sy;
-	struct wlr_surface *surface = desktop_surface_at(
+	struct wlr_surface *surface = phoc_desktop_surface_at(
 		server->desktop,
 		cursor->cursor->x, cursor->cursor->y, &sx, &sy, NULL);
 
