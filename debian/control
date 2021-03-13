@@ -14,7 +14,7 @@ Build-Depends:
  pkg-config,
  wayland-protocols,
  libxcb1-dev,
- libwlroots-dev (>= 0.10.0),
+ libwlroots-dev (>= 0.13.0),
 # to run the tests
  gsettings-desktop-schemas <!nocheck>,
  mutter-common <!nocheck>,

@@ -147,7 +147,7 @@ phoc_server_constructed (GObject *object)
   if (self->wl_display == NULL)
     g_error("Could not create wayland display");
 
-  self->backend = wlr_backend_autocreate(self->wl_display, NULL);
+  self->backend = wlr_backend_autocreate(self->wl_display);
   if (self->backend == NULL)
     g_error("Could not create backend");
 

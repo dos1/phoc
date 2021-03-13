@@ -11,6 +11,7 @@
 #include <wlr/config.h>
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/render/gles2.h>
+#include <wlr/render/egl.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_matrix.h>
 #include <wlr/types/wlr_buffer.h>
@@ -282,16 +283,10 @@ static bool scan_out_fullscreen_view(PhocOutput *output) {
 		return false;
 	}
 
-#if WLR_VERSION_MAJOR == 0 && WLR_VERSION_MINOR < 11
-	if (!wlr_output_attach_buffer(wlr_output, surface->buffer)) {
-		return false;
-	}
-#else
 	wlr_output_attach_buffer(wlr_output, &surface->buffer->base);
 	if (!wlr_output_test(wlr_output)) {
 		return false;
 	}
-#endif
 
 	wlr_presentation_surface_sampled_on_output(output->desktop->presentation, surface, output->wlr_output);
 
@@ -443,7 +438,7 @@ view_render_to_buffer (struct roots_view *view, int width, int height, int strid
   struct wlr_egl *egl = wlr_gles2_renderer_get_egl (server->renderer);
   GLuint tex, fbo;
 
-  if (!surface || !wlr_egl_make_current (egl, EGL_NO_SURFACE, NULL)) {
+  if (!surface || !wlr_egl_make_current (egl)) {
     return FALSE;
   }
 
@@ -467,9 +462,7 @@ view_render_to_buffer (struct roots_view *view, int width, int height, int strid
   glDeleteTextures (1, &tex);
   glBindFramebuffer (GL_FRAMEBUFFER, 0);
 
-#if WLR_VERSION_MAJOR > 0 || WLR_VERSION_MINOR >= 11
   wlr_egl_unset_current (egl);
-#endif
 
   return TRUE;
 }

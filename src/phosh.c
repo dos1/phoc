@@ -404,7 +404,7 @@ thumbnail_frame_handle_copy (struct wl_client   *wl_client,
   uint32_t flags = 0;
   if (!view_render_to_buffer (view, width, height, stride, &flags, data)) {
     wl_shm_buffer_end_access (frame->buffer);
-    zwlr_screencopy_frame_v1_send_failed (frame_resource);
+    zwlr_screencopy_frame_v1_send_failed (frame->resource);
     return;
   }
 

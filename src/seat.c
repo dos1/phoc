@@ -18,6 +18,7 @@
 #include <wlr/types/wlr_switch.h>
 #include <wlr/types/wlr_tablet_v2.h>
 #include <wlr/types/wlr_xcursor_manager.h>
+#include <wlr/types/wlr_tablet_pad.h>
 #include <wlr/util/log.h>
 #include <wlr/version.h>
 #include "cursor.h"
@@ -1231,11 +1232,7 @@ void roots_seat_configure_xcursor(struct roots_seat *seat) {
 	PhocOutput *output;
 	wl_list_for_each(output, &server->desktop->outputs, link) {
 		float scale = output->wlr_output->scale;
-#if (WLR_VERSION_MAJOR > 0 || WLR_VERSION_MINOR > 10)
 		if (!wlr_xcursor_manager_load(seat->cursor->xcursor_manager, scale)) {
-#else
-		if (wlr_xcursor_manager_load(seat->cursor->xcursor_manager, scale)) {
-#endif
 			wlr_log(WLR_ERROR, "Cannot load xcursor theme for output '%s' "
 				"with scale %f", output->wlr_output->name, scale);
 		}

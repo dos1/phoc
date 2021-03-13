@@ -2,6 +2,8 @@
 #define ROOTSTON_CURSOR_H
 
 #include <wlr/types/wlr_pointer_constraints_v1.h>
+#include <wlr/types/wlr_touch.h>
+#include <wlr/types/wlr_tablet_tool.h>
 #include "seat.h"
 
 #define PHOC_SHELL_REVEAL_TOUCH_THRESHOLD 10
