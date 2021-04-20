@@ -416,53 +416,79 @@ view_render_iterator (struct wlr_surface *surface, int sx, int sy, void *data)
   float mat[16];
   wlr_matrix_identity (mat);
 
-  // NDC
-  wlr_matrix_translate (mat, -1, -1);
-  wlr_matrix_scale (mat, 2, 2);
-
-  wlr_matrix_scale (mat, 1 / (float)box.width, 1 / (float)box.height);
-  wlr_matrix_translate (mat, -geo.x, -geo.y);
-
   wlr_matrix_scale (mat, 1 / (float)root->current.scale, 1 / (float)root->current.scale);
   wlr_matrix_scale (mat, view->scale, view->scale);
   wlr_matrix_scale (mat, root->current.scale / surface->current.scale, root->current.scale / surface->current.scale);
+  wlr_matrix_translate (mat, -geo.x, -geo.y);
+
+  // TODO: resize to buffer's size (pass it from view_render_to_buffer)
 
   wlr_render_texture (server->renderer, view_texture, mat, sx * surface->current.scale, sy * surface->current.scale, 1.0);
 }
+
+/*  -------------------------------------------------------------
+ *  XXX: This is mostly a copy of wlroots' private headers.
+ *       This is made only to test the approach, won't be viable until
+ *       wlroots exposes wlr_allocator and wlr_renderer_bind_buffer publicly!
+ */
+struct wlr_allocator;
+struct wlr_allocator_interface;
+struct wlr_allocator {
+  const struct wlr_allocator_interface *impl;
+  struct {
+    struct wl_signal destroy;
+  } events;
+};
+void wlr_allocator_destroy(struct wlr_allocator *alloc);
+struct wlr_buffer *wlr_allocator_create_buffer(struct wlr_allocator *alloc, int width, int height, const struct wlr_drm_format *format);
+struct wlr_gbm_allocator *wlr_gbm_allocator_create(int drm_fd);
+struct wlr_gbm_allocator {
+  struct wlr_allocator base;
+  int fd;
+  struct gbm_device *gbm_device;
+  struct wl_list buffers; // wlr_gbm_buffer.link
+};
+bool wlr_renderer_bind_buffer(struct wlr_renderer *r, struct wlr_buffer *buffer);
+struct wlr_drm_format *wlr_drm_format_create(uint32_t format);
+#include <drm_fourcc.h>
+#include <unistd.h>
+#include <fcntl.h>
+static struct wlr_gbm_allocator *allocator = NULL;
+/*
+ *  end of wlroots private headers and hacks
+ *  -------------------------------------------------------------
+ */
 
 gboolean
 view_render_to_buffer (struct roots_view *view, int width, int height, int stride, uint32_t *flags, void* data)
 {
   PhocServer *server = phoc_server_get_default ();
   struct wlr_surface *surface = view->wlr_surface;
-  struct wlr_egl *egl = wlr_gles2_renderer_get_egl (server->renderer);
-  GLuint tex, fbo;
 
-  if (!surface || !wlr_egl_make_current (egl)) {
+  if (!surface) {
     return FALSE;
   }
 
-  glGenTextures (1, &tex);
-  glBindTexture (GL_TEXTURE_2D, tex);
-  glTexImage2D (GL_TEXTURE_2D, 0, GL_BGRA_EXT, width, height, 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, NULL);
-  glBindTexture (GL_TEXTURE_2D, 0);
+  struct wlr_drm_format *fmt = wlr_drm_format_create(DRM_FORMAT_ARGB8888);
+  if (!allocator) {
+    int drm_fd = fcntl(wlr_renderer_get_drm_fd (server->renderer), F_DUPFD_CLOEXEC, 0);
+    // this should be an allocator reference taken from the backend so it can stay compatible
+    // with other renderers (like pixman), but currently there's no way to reach it, so let's
+    // assume we need the gbm allocator which will usually be the case
+    allocator = wlr_gbm_allocator_create (drm_fd);
+  }
+  struct wlr_buffer *buffer = wlr_allocator_create_buffer (&allocator->base, width, height, fmt);
 
-  glGenFramebuffers (1, &fbo);
-  glBindFramebuffer (GL_FRAMEBUFFER, fbo);
-  glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
-
+  wlr_renderer_bind_buffer (server->renderer, buffer);
   wlr_renderer_begin (server->renderer, width, height);
   wlr_renderer_clear (server->renderer, (float[])COLOR_TRANSPARENT);
   wlr_surface_for_each_surface (surface, view_render_iterator, view);
   wlr_renderer_end (server->renderer);
+  wlr_renderer_read_pixels (server->renderer, DRM_FORMAT_ARGB8888, NULL, stride, width, height, 0, 0, 0, 0, data);
+  wlr_renderer_bind_buffer (server->renderer, NULL);
 
-  wlr_renderer_read_pixels (server->renderer, WL_SHM_FORMAT_ARGB8888, flags, stride, width, height, 0, 0, 0, 0, data);
-
-  glDeleteFramebuffers (1, &fbo);
-  glDeleteTextures (1, &tex);
-  glBindFramebuffer (GL_FRAMEBUFFER, 0);
-
-  wlr_egl_unset_current (egl);
+  wlr_buffer_drop (buffer);
+  free(fmt);
 
   return TRUE;
 }

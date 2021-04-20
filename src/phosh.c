@@ -402,6 +402,8 @@ thumbnail_frame_handle_copy (struct wl_client   *wl_client,
   void *data = wl_shm_buffer_get_data (frame->buffer);
 
   uint32_t flags = 0;
+  // TODO: rendering should happen already on `buffer` event to prevent races,
+  // here we should just copy the rendered frame into the client's buffer
   if (!view_render_to_buffer (view, width, height, stride, &flags, data)) {
     wl_shm_buffer_end_access (frame->buffer);
     zwlr_screencopy_frame_v1_send_failed (frame->resource);
