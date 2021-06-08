@@ -427,33 +427,15 @@ view_render_iterator (struct wlr_surface *surface, int sx, int sy, void *data)
 }
 
 /*  -------------------------------------------------------------
- *  XXX: This is mostly a copy of wlroots' private headers.
- *       This is made only to test the approach, won't be viable until
- *       wlroots exposes wlr_allocator and wlr_renderer_bind_buffer publicly!
+ *  XXX: This is mostly a copy of wlroots' private headers,
+ *       so wlr_allocator can be used before it becomes public API.
  */
 struct wlr_allocator;
-struct wlr_allocator_interface;
-struct wlr_allocator {
-  const struct wlr_allocator_interface *impl;
-  struct {
-    struct wl_signal destroy;
-  } events;
-};
-void wlr_allocator_destroy(struct wlr_allocator *alloc);
+struct wlr_allocator *wlr_allocator_autocreate(struct wlr_backend *backend, struct wlr_renderer *renderer);
 struct wlr_buffer *wlr_allocator_create_buffer(struct wlr_allocator *alloc, int width, int height, const struct wlr_drm_format *format);
-struct wlr_gbm_allocator *wlr_gbm_allocator_create(int drm_fd);
-struct wlr_gbm_allocator {
-  struct wlr_allocator base;
-  int fd;
-  struct gbm_device *gbm_device;
-  struct wl_list buffers; // wlr_gbm_buffer.link
-};
-bool wlr_renderer_bind_buffer(struct wlr_renderer *r, struct wlr_buffer *buffer);
+void wlr_allocator_destroy(struct wlr_allocator *alloc);
 struct wlr_drm_format *wlr_drm_format_create(uint32_t format);
 #include <drm_fourcc.h>
-#include <unistd.h>
-#include <fcntl.h>
-static struct wlr_gbm_allocator *allocator = NULL;
 /*
  *  end of wlroots private headers and hacks
  *  -------------------------------------------------------------
@@ -469,25 +451,18 @@ view_render_to_buffer (struct roots_view *view, int width, int height, int strid
     return FALSE;
   }
 
-  struct wlr_drm_format *fmt = wlr_drm_format_create(DRM_FORMAT_ARGB8888);
-  if (!allocator) {
-    int drm_fd = fcntl(wlr_renderer_get_drm_fd (server->renderer), F_DUPFD_CLOEXEC, 0);
-    // this should be an allocator reference taken from the backend so it can stay compatible
-    // with other renderers (like pixman), but currently there's no way to reach it, so let's
-    // assume we need the gbm allocator which will usually be the case
-    allocator = wlr_gbm_allocator_create (drm_fd);
-  }
-  struct wlr_buffer *buffer = wlr_allocator_create_buffer (&allocator->base, width, height, fmt);
+  struct wlr_drm_format *fmt = wlr_drm_format_create (DRM_FORMAT_ARGB8888);
+  struct wlr_allocator *allocator = wlr_allocator_autocreate (server->backend, server->renderer);
+  struct wlr_buffer *buffer = wlr_allocator_create_buffer (allocator, width, height, fmt);
 
-  wlr_renderer_bind_buffer (server->renderer, buffer);
-  wlr_renderer_begin (server->renderer, width, height);
+  wlr_renderer_begin_with_buffer (server->renderer, buffer);
   wlr_renderer_clear (server->renderer, (float[])COLOR_TRANSPARENT);
   wlr_surface_for_each_surface (surface, view_render_iterator, view);
-  wlr_renderer_end (server->renderer);
   wlr_renderer_read_pixels (server->renderer, DRM_FORMAT_ARGB8888, NULL, stride, width, height, 0, 0, 0, 0, data);
-  wlr_renderer_bind_buffer (server->renderer, NULL);
+  wlr_renderer_end (server->renderer);
 
   wlr_buffer_drop (buffer);
+  wlr_allocator_destroy (allocator);
   free(fmt);
 
   return TRUE;
