@@ -220,7 +220,7 @@ static void roots_passthrough_cursor(struct roots_cursor *cursor,
 		wlr_seat_pointer_notify_enter(seat->seat, surface, sx, sy);
 		wlr_seat_pointer_notify_motion(seat->seat, time, sx, sy);
 	} else {
-		wlr_seat_pointer_clear_focus(seat->seat);
+		wlr_seat_pointer_notify_clear_focus(seat->seat);
 	}
 
 	if (seat->drag_icon != NULL) {

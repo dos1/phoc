@@ -1452,7 +1452,7 @@ void roots_seat_set_focus(struct roots_seat *seat, struct roots_view *view) {
 
 	if (view == NULL) {
 		seat->cursor->mode = ROOTS_CURSOR_PASSTHROUGH;
-		wlr_seat_keyboard_clear_focus(seat->seat);
+		wlr_seat_keyboard_notify_clear_focus(seat->seat);
 		roots_input_method_relay_set_focus(&seat->im_relay, NULL);
 		return;
 	}
@@ -1518,7 +1518,7 @@ void roots_seat_set_focus_layer(struct roots_seat *seat,
 	}
 	if (seat->has_focus) {
 		struct roots_view *prev_focus = roots_seat_get_focus(seat);
-		wlr_seat_keyboard_clear_focus(seat->seat);
+		wlr_seat_keyboard_notify_clear_focus(seat->seat);
 		view_activate(prev_focus, false);
 	}
 	seat->has_focus = false;
@@ -1564,7 +1564,7 @@ void roots_seat_set_exclusive_client(struct roots_seat *seat,
 	}
 	if (seat->seat->pointer_state.focused_client) {
 		if (seat->seat->pointer_state.focused_client->client != client) {
-			wlr_seat_pointer_clear_focus(seat->seat);
+			wlr_seat_pointer_notify_clear_focus(seat->seat);
 		}
 	}
 	struct timespec now;
@@ -1631,7 +1631,7 @@ void roots_seat_begin_move(struct roots_seat *seat, struct roots_view *view) {
 		cursor->view_x = view->box.x + geom.x * view->scale;
 		cursor->view_y = view->box.y + geom.y * view->scale;
 	}
-	wlr_seat_pointer_clear_focus(seat->seat);
+	wlr_seat_pointer_notify_clear_focus(seat->seat);
 
 	roots_seat_maybe_set_cursor (seat, ROOTS_XCURSOR_MOVE);
 }
@@ -1665,7 +1665,7 @@ void roots_seat_begin_resize(struct roots_seat *seat, struct roots_view *view,
 	cursor->view_width = box.width;
 	cursor->view_height = box.height;
 	cursor->resize_edges = edges;
-	wlr_seat_pointer_clear_focus(seat->seat);
+	wlr_seat_pointer_notify_clear_focus(seat->seat);
 
 	const char *resize_name = wlr_xcursor_get_resize_name(edges);
 	roots_seat_maybe_set_cursor (seat, resize_name);
