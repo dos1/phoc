@@ -14,7 +14,7 @@
 #include <wlr/types/wlr_data_control_v1.h>
 #include <wlr/types/wlr_export_dmabuf_v1.h>
 #include <wlr/types/wlr_gamma_control_v1.h>
-#include <wlr/types/wlr_gtk_primary_selection.h>
+#include <wlr/types/wlr_primary_selection_v1.h>
 #include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_idle.h>
 #include <wlr/types/wlr_input_inhibitor.h>
@@ -608,7 +608,7 @@ phoc_desktop_constructed (GObject *object)
   self->idle = wlr_idle_create(server->wl_display);
   self->idle_inhibit = wlr_idle_inhibit_v1_create(server->wl_display);
   self->primary_selection_device_manager =
-    wlr_gtk_primary_selection_device_manager_create(server->wl_display);
+    wlr_primary_selection_v1_device_manager_create(server->wl_display);
   self->input_inhibit =
     wlr_input_inhibit_manager_create(server->wl_display);
   self->input_inhibit_activate.notify = input_inhibit_activate;
